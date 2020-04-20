@@ -24,12 +24,6 @@ class Parser:
         """
         p[0] = p[1]
 
-    def p_declaration_statement(self, p):
-        """
-        statement : decl_statement
-        """
-        p[0] = p[1]
-
     def p_declaration(self, p):
         """
         decl_statement : LET IDENTIFIER EQUALS expression
@@ -51,7 +45,9 @@ class Parser:
     def p_multiple_statement(self, p):
         """
         statement_list : statement
+                       | decl_statement
                        | statement_list SEMICOLON statement
+                       | statement_list SEMICOLON decl_statement
         """
         if len(p) > 2:
             debug("MULTIPLE1", p[1], p[2])
