@@ -1,81 +1,133 @@
-from rply import LexerGenerator, Token
-
-lg = LexerGenerator()
-
-reserved = (
-    'and', 'break', 'case', 'continue', 'default', 'else', 'for', 'float', 'from', 'if', 'int', 'integrate', 'let',
-    'not', 'or', 'print', 'return', 'switch', 'string', 'to', 'type', 'while',
-)
+import ply.lex as lex
 
 
-# Literals
-lg.add("IDENTIFIER", r'[A-Za-z][A-Za-z0-9]*')
-lg.add("FLOATCONST", r'\d+\.\d+')
-lg.add("INTCONST", r'\d+')
-lg.add("STRINGCONST", r'\'.*\'|\".*\"')
+class Lexer:
+    reserved = (
+        'AND', 'BREAK', 'CASE', 'CONTINUE', 'DEFAULT', 'ELSE', 'FOR', 'FLOAT', 'FROM', 'IF', 'INT', 'INTEGRATE', 'LET',
+        'NOT', 'OR', 'PRINT', 'RETURN', 'SWITCH', 'STRING', 'TO', 'TYPE', 'WHILE',
+    )
 
-# Operators
-lg.add("PLUS", r'\+')
-lg.add("MINUS", r'\-')
-lg.add("MUL", r'\*')
-lg.add("DIV", r'/')
-lg.add("POW", r'\^')
-lg.add("LE", r'<=')
-lg.add("GE", r'>=')
-lg.add("LT", r'<')
-lg.add("GT", r'>')
-lg.add("EQ", r'==')
-lg.add("NE", r'!=')
+    tokens = reserved + (
+        # Literals (identifiers, integer identifier, float identifier, string identifier)
+        'IDENTIFIER', 'INTCONST', 'FLOATCONST', 'STRINGCONST',
 
-# Assignment
-lg.add("EQUALS", r'=')
-lg.add("MULEQUALS", r'\*=')
-lg.add("DIVEQUALS", r'/=')
-lg.add("PLUSEQUALS", r'\+=')
-lg.add("MINUSEQUALS", r'-=')
+        # Function Properties
 
-# Increment / Decrement
-lg.add("PLUSPLUS", r'\+\+')
-lg.add("MINUSMINUS", r'--')
+        # Operators (+, -, *, /, ^, <=, >=, <, >, ==, !=)
+        'PLUS', "MINUS", 'MUL', 'DIV', 'POW',
+        'LE', 'GE', 'LT', 'GT',
+        'EQ', 'NE',
 
-# Delimiters
-lg.add("LPAREN", r'\(')
-lg.add("RPAREN", r'\)')
-lg.add("LBRACKET", r'\[')
-lg.add("RBRACKET", r'\]')
-lg.add("LBRACE", r'\{')
-lg.add("RBRACE", r'\}')
-lg.add("COMMA", r'\,')
-lg.add("PERIOD", r'\.')
-lg.add("SEMICOLON", r'\;')
-lg.add("COLON", r'\:')
+        # Assignment (=, *=, /=, +=, -=)
+        'EQUALS', 'MULEQUALS', 'DIVEQUALS', 'PLUSEQUALS', 'MINUSEQUALS',
 
-# Ellipsis
-lg.add("ELLIPSIS", r'\.\.\.')
+        # Increment/Decrement (++, --)
+        'PLUSPLUS', 'MINUSMINUS',
 
-# Ignore spaces and tabs
-lg.ignore('\s+')
+        # Delimiters ( ) [ ] { } , . ; :
+        'LPAREN', 'RPAREN', 'LBRACKET', 'RBRACKET', 'LBRACE', 'RBRACE', 'COMMA', 'PERIOD', 'SEMICOLON', 'COLON',
 
-lexer = lg.build()
+        # Ellipsis (...)
+        'ELLIPSIS',
+    )
+
+    reserved_map = {r.lower(): r for r in reserved}
+
+    # Ignore spaces and tabs
+    t_ignore = ' \t'
+
+    # Operators
+    t_PLUS = r'\+'
+    t_MINUS = r'\-'
+    t_MUL = r'\*'
+    t_DIV = r'/'
+    t_POW = r'\^'
+    t_LE = r'<='
+    t_GE = r'>='
+    t_LT = r'<'
+    t_GT = r'>'
+    t_EQ = r'=='
+    t_NE = r'!='
+
+    # Function Properties
+
+    # Assignment
+    t_EQUALS = r'='
+    t_MULEQUALS = r'\*='
+    t_DIVEQUALS = r'/='
+    t_PLUSEQUALS = r'\+='
+    t_MINUSEQUALS = r'-='
+
+    # Increment / Decrement
+    t_PLUSPLUS = r'\+\+'
+    t_MINUSMINUS = r'--'
+
+    # Delimiters
+    t_LPAREN = r'\('
+    t_RPAREN = r'\)'
+    t_LBRACKET = r'\['
+    t_RBRACKET = r'\]'
+    t_LBRACE = r'\{'
+    t_RBRACE = r'\}'
+    t_COMMA = r'\,'
+    t_PERIOD = r'\.'
+    t_SEMICOLON = r'\;'
+    t_COLON = r'\:'
+
+    # Ellipsis
+    t_ELLIPSIS = r'\.\.\.'
+
+    # Token definitions with action code
+    def t_IDENTIFIER(self, t):
+        r'[A-Za-z][A-Za-z0-9_]*'
+        t.type = self.reserved_map.get(t.value, 'IDENTIFIER')
+        return t
+
+    def t_newline(self, t):
+        r'\n+'
+        t.lexer.lineno += len(t.value)
+
+    # Precedence of floats takes over integers
+    def t_FLOATCONST(self, t):
+        r'\d+\.\d+'
+        t.value = float(t.value)
+        return t
+
+    def t_INTCONST(self, t):
+        r'\d+'
+        t.value = int(t.value)
+        return t
+
+    def t_STRINGCONST(self, t):
+        r'\'.*\'|\".*\"'
+        t.value = str(t.value)
+        return t
+
+    def t_error(self, t):
+        print("Illegal Character '%s'" % t.value[0])
+        t.lexer.skip(1)
+
+    # Build the lexer
+    def build(self, **kwargs):
+        self.lexer = lex.lex(module=self, **kwargs)
+
+    # Pass input and test lexer
+    def test(self, data):
+        self.lexer.input(data)
+        while True:
+            tok = self.lexer.token()
+            if not tok:
+                break
+            print(tok)
 
 
-def reserved_identifier(token):
-    if token.value.lower() in reserved:
-        return Token(token.value.upper(), token.value)
-    return token
+m = Lexer()
+m.build()
+m.test("f(x) : int {2.0;}")
 
 
-callbacks = {"IDENTIFIER": [reserved_identifier]}
-token_names = [rule.name for rule in lg.rules] + [name.upper() for name in reserved]
 
 
-def lex(buf):
-    for token in lexer.lex(buf):
-        for callback in callbacks.get(token.name, []):
-            token = callback(token)
-        yield token
 
 
-if __name__ == "__main__":
-    expr = input("Enter an expression: ")
-    print(list(lex(expr)))
+
