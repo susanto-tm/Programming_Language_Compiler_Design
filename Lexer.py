@@ -2,9 +2,12 @@ import ply.lex as lex
 
 
 class Lexer:
+    states = (
+        ('string', 'inclusive'),
+    )
     reserved = (
-        'AND', 'BREAK', 'CASE', 'CONTINUE', 'DEFAULT', 'ELSE', 'FOR', 'FLOAT', 'FROM', 'IF', 'INT', 'INTEGRATE', 'LET',
-        'NOT', 'OR', 'PRINT', 'RETURN', 'SWITCH', 'STRING', 'TO', 'TYPE', 'WHILE',
+        'AND', 'BREAK', 'CASE', 'CONTINUE', 'DEFAULT', 'ELSE', 'FOR', 'FALSE', 'FLOAT', 'FROM', 'INT', 'IF',
+        'INTEGRATE', 'LET', 'NOT', 'OR', 'PRINT', 'RETURN', 'SWITCH', 'STRING', 'TO', 'TRUE', 'TYPE', 'WHILE',
     )
 
     tokens = reserved + (
@@ -13,8 +16,8 @@ class Lexer:
 
         # Function Properties
 
-        # Operators (+, -, *, /, ^, <=, >=, <, >, ==, !=)
-        'PLUS', "MINUS", 'MUL', 'DIV', 'POW',
+        # Operators (+, -, *, /, %, ^, <=, >=, <, >, ==, !=)
+        'PLUS', "MINUS", 'MUL', 'DIV', 'MOD', 'POW',
         'LE', 'GE', 'LT', 'GT',
         'EQ', 'NE',
 
@@ -34,13 +37,14 @@ class Lexer:
     reserved_map = {r.lower(): r for r in reserved}
 
     # Ignore spaces and tabs
-    t_ignore = ' \t'
+    t_ignore = ' \t\n'
 
     # Operators
     t_PLUS = r'\+'
     t_MINUS = r'\-'
     t_MUL = r'\*'
     t_DIV = r'/'
+    t_MOD = r'\%'
     t_POW = r'\^'
     t_LE = r'<='
     t_GE = r'>='
@@ -49,7 +53,7 @@ class Lexer:
     t_EQ = r'=='
     t_NE = r'!='
 
-    # Function Properties
+    # Booleans
 
     # Assignment
     t_EQUALS = r'='
@@ -83,9 +87,9 @@ class Lexer:
         t.type = self.reserved_map.get(t.value, 'IDENTIFIER')
         return t
 
-    def t_newline(self, t):
-        r'\n+'
-        t.lexer.lineno += len(t.value)
+    # def t_newline(self, t):
+    #     r'\n+'
+    #     t.lexer.lineno += len(t.value)
 
     # Precedence of floats takes over integers
     def t_FLOATCONST(self, t):
@@ -99,9 +103,22 @@ class Lexer:
         return t
 
     def t_STRINGCONST(self, t):
-        r'\'.*\'|\".*\"'
-        t.value = str(t.value)
-        return t
+        r'[\"|\']'
+        t.lexer.begin('string')
+        t.lexer.str_start = t.lexer.lexpos
+        t.lexer.str_marker = t.value
+
+    def t_string_chars(self, t):
+        r'[^\"\'\n]+'
+
+    def t_string_end(self, t):
+        r'[\"\']'
+
+        if t.lexer.str_marker == t.value:
+            t.type = 'STRINGCONST'
+            t.value = t.lexer.lexdata[t.lexer.str_start:t.lexer.lexpos - 1]
+            t.lexer.begin('INITIAL')
+            return t
 
     def t_error(self, t):
         print("Illegal Character '%s'" % t.value[0])
@@ -119,15 +136,4 @@ class Lexer:
             if not tok:
                 break
             print(tok)
-
-
-m = Lexer()
-m.build()
-m.test("f(x) : int {2.0;}")
-
-
-
-
-
-
 
