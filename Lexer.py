@@ -53,6 +53,10 @@ class Lexer:
     t_EQ = r'=='
     t_NE = r'!='
 
+    # Increment / Decrement
+    t_PLUSPLUS = r'\+\+'
+    t_MINUSMINUS = r'\-\-'
+
     # Booleans
 
     # Assignment
@@ -61,10 +65,6 @@ class Lexer:
     t_DIVEQUALS = r'/='
     t_PLUSEQUALS = r'\+='
     t_MINUSEQUALS = r'-='
-
-    # Increment / Decrement
-    t_PLUSPLUS = r'\+\+'
-    t_MINUSMINUS = r'--'
 
     # Delimiters
     t_LPAREN = r'\('
@@ -82,6 +82,10 @@ class Lexer:
     t_ELLIPSIS = r'\.\.\.'
 
     # Token definitions with action code
+    def t_COMMENT(self, t):
+        r'\/\/.*'
+        pass
+
     def t_IDENTIFIER(self, t):
         r'[A-Za-z][A-Za-z0-9_]*'
         t.type = self.reserved_map.get(t.value, 'IDENTIFIER')
