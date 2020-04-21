@@ -15,7 +15,6 @@ class Parser:
         ('left', 'PLUS', 'MINUS'),
         ('left', 'MUL', 'DIV', 'MOD'),
         ('right', 'POW'),
-        ('left', 'INCRDECR'),
         ('right', 'NEGATE')
     )
 
@@ -126,14 +125,14 @@ class Parser:
 
     def p_expression_increment(self, p):
         """
-        expression : IDENTIFIER PLUSPLUS %prec INCRDECR
+        expression : IDENTIFIER PLUSPLUS
         """
         debug("PLUSPLUS", p[1])
         p[0] = AST(action='binop', params=[AST(action='get', params=[p[1]]), '+', 1])
 
     def p_expression_decrement(self, p):
         """
-        expression : IDENTIFIER MINUSMINUS %prec INCRDECR
+        expression : IDENTIFIER MINUSMINUS
         """
         debug("MINUSMINUS", p[1])
         p[0] = AST(action='binop', params=[AST(action='get', params=[p[1]]), '-', 1])
