@@ -9,6 +9,7 @@ evaluated based on control flow.
 
 DEBUG_MODE = True
 symbols = {}  # holds symbols for variables
+state = [""]  # holds current variable state and scope
 
 
 class Node:
@@ -50,26 +51,56 @@ class AST:
 
     def visit_Variable(self, node):
         debug("VARIABLE", node, node.action, node.param, symbols)
+
         if node.action == 'assign':
             # visit right hand side to see what value it holds
             lhs = node.param[0]
             rhs = self.visit(node.param[1])
             if lhs in symbols:
                 raise NameError(f"name '{node.param[0]}' already exist")
-            symbols[lhs] = rhs
+            if 'local_' + state[0] in symbols:
+                # local key only exists if it is added in different scopes
+                symbols['local_'+state[0]][lhs] = rhs
+            else:
+                symbols[lhs] = rhs
 
         elif node.action == 'reassign':
+            error = False
             lhs = node.param[0]
             rhs = self.visit(node.param[1])
-            if lhs not in symbols:
+            if 'local_'+state[0] in symbols:  # in local scope
+                if lhs not in symbols:
+                    if lhs not in symbols['local_'+state[0]]:
+                        error = True
+                    else:
+                        symbols['local_'+state[0]][lhs] = rhs
+                elif lhs in symbols:
+                    symbols[lhs] = rhs
+            elif 'local_'+state[0] not in symbols:
+                if lhs in symbols:
+                    symbols[lhs] = rhs
+                else:
+                    error = True
+
+            if error:
                 raise NameError(f"name '{node.param[0]}' not defined")
-            symbols[lhs] = rhs
 
         elif node.action == 'get':
+            error, local = False, 'local_'+state[0] in symbols
             identifier = self.visit(node.param)
-            if identifier not in symbols:
-                raise NameError(f"name '{identifier}' not defined")
-            return symbols[identifier]
+            if symbols or local:
+                if identifier in symbols:
+                    return symbols[identifier]
+                elif local:
+                    if identifier in symbols['local_'+state[0]]:
+                        return symbols['local_'+state[0]][identifier]
+                    else:
+                        error = True
+                else:
+                    error = True
+
+            if error:
+                raise (NameError(f"name '{identifier}' not defined"))
 
     def visit_BinaryOp(self, node):
         debug("BINARY OP", node, node.action, node.param)
@@ -109,6 +140,49 @@ class AST:
 
         return result
 
+    def visit_IfElseBlock(self, node):
+        # combines both if and else blocks to manage the control flow
+        if not self.visit(node.param[0]):
+            self.visit(node.param[1])
+
+    def visit_IfStmt(self, node):
+        # holds individual if statement and else statement evaluation
+        # node.param[0] holds the condition and node.param[1] holds the basic block
+        debug("IF STATEMENT", node, node.action, node.param)
+        if self.visit(node.param[0]):
+            state[0] = 'if'
+            symbols['local_' + state[0]] = {}  # initialize storage of local variables
+            # since parameters are basic blocks, they are always in list format
+            for actions in node.param[1]:
+                self.visit(actions)
+
+            # destroy local variables
+            symbols.pop('local_'+state[0])
+
+            # reset state
+            state[0] = ""
+
+            return True  # for if else statements method will decide whether else is needed
+
+        return False
+
+    def visit_ElseStmt(self, node):
+        debug("ELSE STATEMENT", node, node.action, node.param)
+        state[0] = 'else'
+        symbols['local_'+state[0]] = {}
+
+        if isinstance(node.param, list):
+            for actions in node.param:
+                self.visit(actions)
+        else:
+            self.visit(node.param)
+
+        # destroy local variable
+        symbols.pop('local_'+state[0])
+
+        # reset state
+        state[0] = ""
+
 
 """
 -----------------------------------------------------------------------------------
@@ -142,6 +216,22 @@ class BinaryOp(Node):
 class BoolOp(Node):
     def __init__(self, action, param):
         super().__init__(action, param)
+
+
+class IfElseBlock(Node):
+    def __init__(self, action, param):
+        super().__init__(action, param)
+
+
+class IfStmt(Node):
+    def __init__(self, action, param):
+        super().__init__(action, param)
+
+
+class ElseStmt(Node):
+    def __init__(self, action, param):
+        super().__init__(action, param)
+
 
 """
 -----------------------------------------------------------------------------------
