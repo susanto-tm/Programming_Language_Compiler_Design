@@ -1,187 +1,168 @@
 import ply.yacc as yacc
 from Lexer import Lexer
-from Compiler import AST
+from AST import *
 
+astList = []
 DEBUG_MODE = True
 
 
 class Parser:
     tokens = Lexer.tokens
     precedence = (
-        # ('nonassoc', 'LOOP_INSTRUCT'),
-        # ('nonassoc', 'IFX', 'FOR'),
-        ('left', 'CONDITION'),
-        ('left', 'LT', 'LE', 'GT', 'GE', 'EQ', 'NE'),
+        ('left', 'COND'),
         ('left', 'PLUS', 'MINUS'),
         ('left', 'MUL', 'DIV', 'MOD'),
-        ('right', 'POW'),
-        ('right', 'NEGATE')
+        ('right', 'POW')
     )
+
+    def p_program(self, p):
+        """
+        program : commands
+        """
+        print(astList)
+        p[0] = AST(action='eval', param=astList)
+
+    def p_commands(self, p):
+        """
+        commands : commands basic_block
+                 | empty
+        """
+        if len(p) > 2:
+            debug("Adding command", )
+            astList.extend(p[2])
+            p[0] = p[2]
+        else:
+            debug("COMMANDS", p[1:])
+
+    def p_basic_block(self, p):
+        """
+        basic_block : line_statement
+                    | basic_block line_statement
+        """
+        if len(p) > 2:
+            p[0] = p[1] + [p[2]]
+        else:
+            p[0] = [p[1]]
 
     def p_line_statement(self, p):
         """
-        line_statement : statement_list SEMICOLON
+        line_statement : statement SEMICOLON
         """
+        debug("Statement", p[1].__class__.__name__, p[1].action, p[1].param)
         p[0] = p[1]
-
-    def p_declaration(self, p):
-        """
-        decl_statement : LET IDENTIFIER EQUALS expression
-                       | LET IDENTIFIER
-        """
-        if len(p) > 4:
-            p[0] = AST(action='assign', params=[p[2], p[4]])
-        else:
-            debug("IDENTIFIER", p[2])
-            p[0] = AST(action='assign', params=[p[2], 0])
-
-    def p_decl_assign(self, p):
-        """
-        decl_statement : IDENTIFIER EQUALS expression
-        """
-        debug("Reassign", p[1])
-        p[0] = AST(action='reassign', params=[p[1], p[3]])
-
-    def p_multiple_statement(self, p):
-        """
-        statement_list : statement
-                       | decl_statement
-                       | statement_list SEMICOLON statement
-                       | statement_list SEMICOLON decl_statement
-        """
-        if len(p) > 2:
-            debug("NESTED STATEMENT", p[1], p[2])
-            p[0] = p[1] + [p[3]]
-        else:
-            debug("SINGLE STATEMENT", p[1])
-            p[0] = [p[1]]
 
     def p_print_statement(self, p):
         """
         statement : PRINT LPAREN expr_list RPAREN
         """
-        p[0] = AST(action='print', params=p[3])
+        debug("PRINT", p[3])
+        p[0] = Print(action='print', param=p[3])
 
-    def p_expression_bool_true(self, p):
+    def p_assign(self, p):
         """
-        expression : TRUE
+        statement : LET IDENTIFIER EQUALS expr
         """
-        p[0] = True
+        debug("Assignment", p[4].action)
+        p[0] = Variable(action='assign', param=[p[2], p[4]])
 
-    def p_expression_bool_false(self, p):
+    def p_reassign(self, p):
         """
-        expression : FALSE
+        statement : IDENTIFIER EQUALS expr
         """
-        debug("FALSE", type(p[1]))
-        p[0] = False
+        p[0] = Variable(action='reassign', param=[p[1], p[3]])
 
-    def p_expression_var(self, p):
+    def p_expr_list(self, p):
         """
-        expression : IDENTIFIER
-        """
-        debug("EXPR IDEN", p[1])
-        p[0] = AST(action='get', params=[p[1]])
-
-    def p_expression_float(self, p):
-        """
-        expression : FLOATCONST
-        """
-        p[0] = float(p[1])
-
-    def p_expression_integer(self, p):
-        """
-        expression : INTCONST
-        """
-        p[0] = int(p[1])
-
-    def p_expression_string(self, p):
-        """
-        expression : STRINGCONST
-        """
-        p[0] = str(p[1])
-
-    def p_expression_neg(self, p):
-        """
-        expression : MINUS expression %prec NEGATE
-        """
-        p[0] = AST(action='binop', params=[-1, '*', p[2]])
-
-    def p_expression_binop(self, p):
-        """
-        expression : expression PLUS expression
-                   | expression MINUS expression
-                   | expression MUL expression
-                   | expression DIV expression
-                   | expression MOD expression
-                   | expression POW expression
-                   | expression GT expression
-                   | expression GE expression
-                   | expression LT expression
-                   | expression LE expression
-                   | expression EQ expression
-                   | expression NE expression
-        """
-        p[0] = AST(action='binop', params=p[1:])
-
-    def p_expression_increment(self, p):
-        """
-        expression : IDENTIFIER PLUSPLUS
-        """
-        debug("PLUSPLUS", p[1])
-        p[0] = AST(action='binop', params=[AST(action='get', params=[p[1]]), '+', 1])
-
-    def p_expression_decrement(self, p):
-        """
-        expression : IDENTIFIER MINUSMINUS
-        """
-        debug("MINUSMINUS", p[1])
-        p[0] = AST(action='binop', params=[AST(action='get', params=[p[1]]), '-', 1])
-
-    def p_expression_list(self, p):
-        """
-        expr_list : expression
-                  | expr_list COMMA expression
-                  | condition_list
+        expr_list : expr
+                  | cond_list
+                  | expr_list expr
         """
         if len(p) > 2:
-            p[0] = p[1] + [p[3]]
+            p[0] = p[1] + [p[2]]
         else:
-            p[0] = [p[1]]
-
-    def p_expression_parens(self, p):
-        """
-        expression : LPAREN expression RPAREN
-        """
-        p[0] = p[2]
-    # TODO -- make a condition a statement
-    # def p_statement_condition(self, p):
-    #     """
-    #     line_statement : IF LPAREN condition_list RPAREN LBRACE line_statement RBRACE %prec IFX
-    #                    | statement_block ELSE LBRACE line_statement RBRACE %prec IFX
-    #     """
-    #     if len(p) > 6:
-    #         p[0] = p[3]
-    #         # p[0] = AST(action='condition', params=[p[3], p[6]])
-    #     else:
-    #         p[0] = p[4]
-
-    def p_condition_list(self, p):
-        """
-        condition_list : expression %prec CONDITION
-                       | condition_list AND expression
-                       | condition_list OR expression
-        """
-        if len(p) > 2:
-            p[0] = AST(action='boolop', params=p[1:])
-        else:
-            debug("CONDITION", type(p[1].compile()), p[1].compile())
             p[0] = p[1]
 
-    def p_error(self, p):
-        raise SyntaxError("invalid syntax")
+    def p_binop(self, p):
+        """
+        expr : expr PLUS expr
+             | expr MINUS expr
+             | expr MUL expr
+             | expr DIV expr
+             | expr MOD expr
+             | expr POW expr
+             | expr LE expr
+             | expr GE expr
+             | expr LT expr
+             | expr GT expr
+             | expr EQ expr
+             | expr NE expr
+        """
+        p[0] = BinaryOp(action='binop', param=p[1:])
+
+    def p_increment(self, p):
+        """
+        expr : expr PLUSPLUS
+        """
+        p[0] = BinaryOp(action='binop', param=[p[1], '+', Literal(action='INTCONST', param=1)])
+
+    def p_decrement(self, p):
+        """
+        expr : expr MINUSMINUS
+        """
+        p[0] = BinaryOp(action='binop', param=[p[1], '-', Literal(action='INTCONST', param=1)])
+
+    def p_iden(self, p):
+        """
+        expr : IDENTIFIER
+        """
+        p[0] = Variable(action='get', param=Literal(action='IDEN', param=p[1]))
+
+    def p_integer_const(self, p):
+        """
+        expr : INTCONST
+        """
+        p[0] = Literal(action='INTCONST', param=int(p[1]))
+
+    def p_float_const(self, p):
+        """
+        expr : FLOATCONST
+        """
+        p[0] = Literal(action="FLOATCONST", param=float(p[1]))
+
+    def p_string_const(self, p):
+        """
+        expr : STRINGCONST
+        """
+        p[0] = Literal(action="STRINGCONST", param=str(p[1]))
+
+    def p_boolean(self, p):
+        """
+        expr : TRUE
+             | FALSE
+        """
+        expr = None
+        if p[1] == 'true':
+            expr = True
+        elif p[1] == 'false':
+            expr = False
+
+        p[0] = Literal(action='BOOLEAN', param=bool(expr))
+
+    def p_cond_list(self, p):
+        """
+        cond_list : expr %prec COND
+                  | cond_list AND expr
+                  | cond_list OR expr
+        """
+        if len(p) > 2:
+            p[0] = BoolOp(action='boolop', param=p[1:])
+        else:
+            p[0] = p[1]
 
     def p_empty(self, p):
-        """empty :"""
+        """
+        empty :
+        """
         pass
 
     def build(self):
