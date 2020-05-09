@@ -100,7 +100,7 @@ class AST:
                     error = True
 
             if error:
-                raise (NameError(f"name '{identifier}' not defined"))
+                raise NameError(f"name '{identifier}' not defined")
 
     def visit_BinaryOp(self, node):
         debug("BINARY OP", node, node.action, node.param)
