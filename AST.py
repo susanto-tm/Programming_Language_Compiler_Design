@@ -9,8 +9,8 @@ evaluated based on control flow.
 
 DEBUG_MODE = True
 symbols = {}  # holds symbols for variables
-state = [""]  # holds current variable state and scope
-
+state = [""]  # a stack that holds current variable state and scope
+# TODO -- controlling scopes through next state being the larger scope for get variables
 
 class Node:
     def __init__(self, action, param):
@@ -44,10 +44,11 @@ class AST:
 
     def visit_Print(self, node):
         debug("PRINT", node, node.action, node.param)
+        printed_param = ""
         if isinstance(node.param, Node):
-            node.param = self.visit(node.param)
+            printed_param = self.visit(node.param)
 
-        print(' '.join(str(x) for x in list([node.param])))
+        print(' '.join(str(x) for x in list([printed_param])))
 
     def visit_Variable(self, node):
         debug("VARIABLE", node, node.action, node.param, symbols)
@@ -63,6 +64,8 @@ class AST:
                 symbols['local_'+state[0]][lhs] = rhs
             else:
                 symbols[lhs] = rhs
+
+            return rhs
 
         elif node.action == 'reassign':
             error = False
@@ -86,13 +89,17 @@ class AST:
                 raise NameError(f"name '{node.param[0]}' not defined")
 
         elif node.action == 'get':
-            error, local = False, 'local_'+state[0] in symbols
+            error, local = False, any('local' in keys for keys in symbols)
             identifier = self.visit(node.param)
             if symbols or local:
                 if identifier in symbols:
                     return symbols[identifier]
                 elif local:
-                    if identifier in symbols['local_'+state[0]]:
+                    if identifier not in symbols["local_"+state[0]]:
+                        if len(state) > 1:
+                            if identifier in symbols["local_"+state[1]]:
+                                return symbols['local_'+state[1]][identifier]
+                    elif identifier in symbols['local_'+state[0]]:
                         return symbols['local_'+state[0]][identifier]
                     else:
                         error = True
@@ -146,23 +153,21 @@ class AST:
             self.visit(node.param[1])
 
     def visit_IfStmt(self, node):
-        # holds individual if statement and else statement evaluation
+        # holds evaluation of an if statement and returns if an else will be evaluated
         # node.param[0] holds the condition and node.param[1] holds the basic block
         debug("IF STATEMENT", node, node.action, node.param)
+        state[0] = 'if'
+        symbols['local_' + state[0]] = {}  # initialize storage of local variables
         if self.visit(node.param[0]):
-            state[0] = 'if'
-            symbols['local_' + state[0]] = {}  # initialize storage of local variables
             # since parameters are basic blocks, they are always in list format
             for actions in node.param[1]:
                 self.visit(actions)
 
-            # destroy local variables
-            symbols.pop('local_'+state[0])
-
-            # reset state
-            state[0] = ""
+            self.reset_local()
 
             return True  # for if else statements method will decide whether else is needed
+
+        self.reset_local()
 
         return False
 
@@ -177,12 +182,40 @@ class AST:
         else:
             self.visit(node.param)
 
-        # destroy local variable
+        self.reset_local()
+
+    def visit_Range(self, node):
+        debug("RANGE", node, node.action, node.param)
+        start = self.visit(node.param[0])
+        end = self.visit(node.param[1])
+
+        return list(range(start, end))
+
+    def visit_ForStmt(self, node):
+        # Accepts param = [iterating symbol, range of iteration, block to execute]
+        debug("FOR STATEMENT", node, node.action, node.param)
+        state[0] = 'for_loop'
+        loop_range = self.visit(node.param[1])
+        iter_symbol = node.param[0]
+        symbols['local_' + state[0]] = {iter_symbol: loop_range[0]}
+        block = node.param[2]
+
+        for i in loop_range:
+            debug("LOOP ITER", i, loop_range, symbols)
+            symbols['local_'+state[0]][iter_symbol] = i
+            for stmt in block:
+                if stmt.__class__.__name__ in ['IfElseBlock', 'IfStmt']:
+                    # push a new state, to be determined by what is being called
+                    state.insert(0, "")
+                self.visit(stmt)
+            if len(state) > 1:
+                state.pop(0)  # pop the stack
+
+        self.reset_local()
+
+    def reset_local(self):
         symbols.pop('local_'+state[0])
-
-        # reset state
         state[0] = ""
-
 
 """
 -----------------------------------------------------------------------------------
@@ -232,6 +265,15 @@ class ElseStmt(Node):
     def __init__(self, action, param):
         super().__init__(action, param)
 
+
+class Range(Node):
+    def __init__(self, action, param):
+        super().__init__(action, param)
+
+
+class ForStmt(Node):
+    def __init__(self, action, param):
+        super().__init__(action, param)
 
 """
 -----------------------------------------------------------------------------------

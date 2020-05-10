@@ -25,7 +25,7 @@ if SHOW_LEX:
 parser = Parser().build()
 ast = parser.parse(text, debug=DEBUG)
 
-print("\nCode to execute:\n"+text)
-print()
+# print("\nCode to execute:\n"+text)
+# print()
 
 ast.eval()

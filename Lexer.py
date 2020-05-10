@@ -21,8 +21,8 @@ class Lexer:
         'LE', 'GE', 'LT', 'GT',
         'EQ', 'NE',
 
-        # Assignment (=, *=, /=, +=, -=)
-        'EQUALS', 'MULEQUALS', 'DIVEQUALS', 'PLUSEQUALS', 'MINUSEQUALS',
+        # Assignment (=, *=, /=, +=, -=, :=)
+        'EQUALS', 'MULEQUALS', 'DIVEQUALS', 'PLUSEQUALS', 'MINUSEQUALS', 'WALRUS',
 
         # Increment/Decrement (++, --)
         'PLUSPLUS', 'MINUSMINUS',
@@ -65,6 +65,7 @@ class Lexer:
     t_DIVEQUALS = r'/='
     t_PLUSEQUALS = r'\+='
     t_MINUSEQUALS = r'-='
+    t_WALRUS = r'\:='
 
     # Delimiters
     t_LPAREN = r'\('

@@ -19,7 +19,7 @@ class Parser:
         """
         program : commands
         """
-        print(astList)
+        #print(astList)
         p[0] = AST(action='eval', param=astList)
 
     def p_commands(self, p):
@@ -62,6 +62,12 @@ class Parser:
         else:
             debug("IF ELSE LINE STMT", p[1].__class__.__name__, p[1].action, p[1].param)
             p[0] = p[1]
+
+    def p_for_loop_statement(self, p):
+        """
+        line_statement : for_line
+        """
+        p[0] = p[1]
 
     def p_print_statement(self, p):
         """
@@ -191,6 +197,17 @@ class Parser:
         debug("ELSE DECL", p[3])
         p[0] = ElseStmt(action='else_branch', param=p[3])
 
+    def p_for_line(self, p):
+        """
+        for_line : FOR IDENTIFIER WALRUS range LBRACE basic_block RBRACE
+        """
+        p[0] = ForStmt(action='for_loop', param=[p[2], p[4], p[6]])
+
+    def p_range_generator(self, p):
+        """
+        range : LPAREN expr ELLIPSIS expr RPAREN
+        """
+        p[0] = Range(action='range_decl', param=[p[2], p[4]])
 
     def p_empty(self, p):
         """

@@ -1,8 +1,11 @@
 let a = 33;
 let b = 50;
+let c = false;
 
-if a == 32 {
-    print(a);
-} else {
-    print(b);
+for i := (1...5) {
+    if i % 2 == 0 {
+        print(a);
+    } else {
+        print(b);
+    }
 }
