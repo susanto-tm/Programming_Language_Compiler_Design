@@ -24,6 +24,7 @@ if SHOW_LEX:
 
 parser = Parser().build()
 ast = parser.parse(text, debug=DEBUG)
+print(ast.param)
 
 # print("\nCode to execute:\n"+text)
 # print()

@@ -127,7 +127,6 @@ class AST:
                 raise NameError(f"name '{node.param[0]}' already exist")
             if state[0] in local_symbols:
                 # local key only exists if it is added in different scopes
-                print("STATE RIGHT NOW", state[0])
                 local_symbols[state[0]][lhs] = rhs
             else:
                 symbols['global'][lhs] = rhs
@@ -371,9 +370,7 @@ class AST:
         debug("FUNCTION DECLARE", node, node.action, node.param)
         # func_states = list(filter(lambda a: a.startswith('func'), symbols['local'].keys()))
         func_scope = self.add_func_scope(node.param[0])
-        print(state, function_state)
         symbols['local'][func_scope] = {'params': {}}
-        print(node.param[1][0].param)
 
         for var_param in node.param[1]:
             self.visit(var_param)
