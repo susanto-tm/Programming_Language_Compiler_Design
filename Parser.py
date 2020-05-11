@@ -12,14 +12,15 @@ class Parser:
         ('left', 'COND'),
         ('left', 'PLUS', 'MINUS'),
         ('left', 'MUL', 'DIV', 'MOD'),
-        ('right', 'POW')
+        ('right', 'POW'),
+        ('right', 'NEGATE')
     )
 
     def p_program(self, p):
         """
         program : commands
         """
-        #print(astList)
+        # print(astList)
         p[0] = AST(action='eval', param=astList)
 
     def p_commands(self, p):
@@ -66,6 +67,8 @@ class Parser:
     def p_for_loop_statement(self, p):
         """
         line_statement : for_line
+                       | while_line
+                       | func_line
         """
         p[0] = p[1]
 
@@ -79,9 +82,15 @@ class Parser:
     def p_assign(self, p):
         """
         statement : LET IDENTIFIER EQUALS expr
+                  | LET IDENTIFIER
         """
-        debug("Assignment", p[4].action)
-        p[0] = Variable(action='assign', param=[p[2], p[4]])
+        if len(p) > 3:
+            debug("Assignment", p[4].action)
+            p[0] = Variable(action='assign', param=[p[2], p[4]])
+        else:
+            debug("Assignment", p[2])
+            p[0] = Variable(action='assign', param=[p[2], Literal(action='INTCONST', param=0)])
+
 
     def p_reassign(self, p):
         """
@@ -89,16 +98,52 @@ class Parser:
         """
         p[0] = Variable(action='reassign', param=[p[1], p[3]])
 
+    def p_reassign_plus_equals(self, p):
+        """
+        statement : IDENTIFIER PLUSEQUALS expr
+                  | IDENTIFIER MINUSEQUALS expr
+                  | IDENTIFIER MULEQUALS expr
+                  | IDENTIFIER DIVEQUALS expr
+                  | IDENTIFIER MODEQUALS expr
+                  | IDENTIFIER POWEQUALS expr
+        """
+        p[0] = Variable(action='reassign', param=[p[1], VariableBinopReassign(action=p[2], param=[
+            Variable(action='get', param=Literal(action='IDEN', param=p[1])), p[3]])])
+
+    def p_incr_decr_statement(self, p):
+        """
+        statement : incr_decr
+        """
+        p[0] = p[1]
+
+    def p_list_assign_statement(self, p):
+        """
+        statement : IDENTIFIER LBRACKET expr_list RBRACKET EQUALS expr
+        """
+        p[0] = List(action='assign', param=[p[1], p[3], p[6]])
+
+    def p_function_call(self, p):
+        """
+        statement : IDENTIFIER LPAREN expr_list RPAREN
+        """
+        p[0] = FuncCall(action='exec', param=[p[1], p[3]])
+
     def p_expr_list(self, p):
         """
         expr_list : expr
                   | cond_list
-                  | expr_list expr
+                  | expr_list COMMA expr
         """
         if len(p) > 2:
-            p[0] = p[1] + [p[2]]
+            p[0] = p[1] + [p[3]]
         else:
-            p[0] = p[1]
+            p[0] = [p[1]]
+
+    def p_assign_expr(self, p):
+        """
+        expr : LET IDENTIFIER
+        """
+        p[0] = Variable(action='assign', param=[p[2], Literal(action='INTCONST', param=0)])
 
     def p_binop(self, p):
         """
@@ -117,17 +162,24 @@ class Parser:
         """
         p[0] = BinaryOp(action='binop', param=p[1:])
 
-    def p_increment(self, p):
+    def p_unary_negate(self, p):
         """
-        expr : expr PLUSPLUS
+        expr : MINUS expr %prec NEGATE
         """
-        p[0] = BinaryOp(action='binop', param=[p[1], '+', Literal(action='INTCONST', param=1)])
+        p[0] = BinaryOp(action='binop', param=[
+            Literal(action='INTCONST', param=-1),
+            '*',
+            p[2]
+        ])
 
-    def p_decrement(self, p):
+    def p_increment_decrement(self, p):
         """
-        expr : expr MINUSMINUS
+        incr_decr : IDENTIFIER PLUSPLUS
+                  | IDENTIFIER MINUSMINUS
         """
-        p[0] = BinaryOp(action='binop', param=[p[1], '-', Literal(action='INTCONST', param=1)])
+        p[0] = Variable(action='reassign_get', param=[
+            p[1],
+            VariableIncrDecr(action=p[2], param=Variable(action='get', param=Literal(action="IDEN", param=p[1])))])
 
     def p_iden(self, p):
         """
@@ -153,6 +205,41 @@ class Parser:
         """
         p[0] = Literal(action="STRINGCONST", param=str(p[1]))
 
+    def p_list_const(self, p):
+        """
+        expr : LBRACKET expr_list RBRACKET
+        """
+        p[0] = Literal(action="LISTCONST", param=list(p[2]))
+
+    def p_list_const_generate(self, p):
+        """
+        expr : LBRACKET range RBRACKET
+        """
+        p[0] = List(action='range', param=p[2])
+
+    def p_list_indexing(self, p):
+        """
+        expr : IDENTIFIER LBRACKET expr_list RBRACKET
+        """
+        p[0] = List(action='get', param=[p[1], p[3]])
+
+    def p_list_slicing(self, p):
+        """
+        expr : IDENTIFIER LBRACKET expr COLON expr RBRACKET
+             | IDENTIFIER LBRACKET expr COLON expr COLON expr RBRACKET
+        """
+        if len(p) > 7:
+            p[0] = List(action='slice', param=[p[1], p[3], p[5], p[7]])
+        else:
+            p[0] = List(action='slice', param=[p[1], p[3], p[5],
+                                               Literal(action='INTCONST', param=1)])
+
+    def p_function_line(self, p):
+        """
+        func_line : FUNC IDENTIFIER LPAREN expr_list RPAREN LBRACE basic_block RBRACE
+        """
+        p[0] = FuncDecl(action='func_block', param=[p[2], p[4], p[7]])
+
     def p_boolean(self, p):
         """
         expr : TRUE
@@ -171,6 +258,12 @@ class Parser:
         expr : LPAREN expr RPAREN
         """
         p[0] = p[2]
+
+    def p_expr_incr_decr(self, p):
+        """
+        expr : incr_decr
+        """
+        p[0] = p[1]
 
     def p_cond_list(self, p):
         """
@@ -199,15 +292,35 @@ class Parser:
 
     def p_for_line(self, p):
         """
-        for_line : FOR IDENTIFIER WALRUS range LBRACE basic_block RBRACE
+        for_line : FOR IDENTIFIER WALRUS RANGE range LBRACE basic_block RBRACE
         """
-        p[0] = ForStmt(action='for_loop', param=[p[2], p[4], p[6]])
+        p[0] = ForStmt(action='for_loop', param=[p[2], p[5], p[7]])
+
+    def p_for_line_single_range(self, p):
+        """
+        for_line : FOR IDENTIFIER WALRUS RANGE expr LBRACE basic_block RBRACE
+        """
+        p[0] = ForStmt(action='for_loop', param=[
+            p[2],
+            Range(action='range_decl', param=[Literal(action='INTCONST', param=0),
+                                              p[5],
+                                              Literal(action='INTCONST', param=1)]),p[7]])
+
+    def p_while_line(self, p):
+        """
+        while_line : FOR cond_list LBRACE basic_block RBRACE
+        """
+        p[0] = WhileStmt(action='while_loop', param=[p[2], p[4]])
 
     def p_range_generator(self, p):
         """
-        range : LPAREN expr ELLIPSIS expr RPAREN
+        range : expr ELLIPSIS expr
+              | expr ELLIPSIS expr COMMA expr
         """
-        p[0] = Range(action='range_decl', param=[p[2], p[4]])
+        if len(p) > 4:
+            p[0] = Range(action='range_decl', param=[p[1], p[3], p[5]])
+        else:
+            p[0] = Range(action='range_decl', param=[p[1], p[3], Literal(action='INTCONST', param=1)])
 
     def p_empty(self, p):
         """

@@ -1,11 +1,20 @@
-let a = 33;
-let b = 50;
-let c = false;
+// Variable Declaration
+let arr = [1, 3, 2, 5, 1, 0, 2, 3];
+let n = 8;
 
-for i := (1...5) {
-    if i % 2 == 0 {
-        print(a);
-    } else {
-        print(b);
+// Bubble Sort Function
+func bubble_sort(let lst) {
+    for i := range n {
+        for j := range 0...(n-1-i) {
+            if lst[j] > lst[j+1] {
+                let temp = lst[j];
+                lst[j] = lst[j+1];
+                lst[j+1] = temp;
+            }
+        }
     }
 }
+
+bubble_sort(arr);
+
+print('Sorted array:', arr);

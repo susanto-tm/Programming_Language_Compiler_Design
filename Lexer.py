@@ -6,8 +6,8 @@ class Lexer:
         ('string', 'inclusive'),
     )
     reserved = (
-        'AND', 'BREAK', 'CASE', 'CONTINUE', 'DEFAULT', 'ELSE', 'FOR', 'FALSE', 'FLOAT', 'FROM', 'INT', 'IF',
-        'INTEGRATE', 'LET', 'NOT', 'OR', 'PRINT', 'RETURN', 'SWITCH', 'STRING', 'TO', 'TRUE', 'TYPE', 'WHILE',
+        'AND', 'BREAK', 'CASE', 'CONTINUE', 'DEFAULT', 'ELSE', 'FOR', 'FALSE', 'FLOAT', 'FROM', 'FUNC', 'INT', 'IF',
+        'INTEGRATE', 'LET', 'NOT', 'OR', 'PRINT', 'RETURN', 'RANGE', 'SWITCH', 'STRING', 'TO', 'TRUE', 'TYPE', 'WHILE',
     )
 
     tokens = reserved + (
@@ -21,8 +21,8 @@ class Lexer:
         'LE', 'GE', 'LT', 'GT',
         'EQ', 'NE',
 
-        # Assignment (=, *=, /=, +=, -=, :=)
-        'EQUALS', 'MULEQUALS', 'DIVEQUALS', 'PLUSEQUALS', 'MINUSEQUALS', 'WALRUS',
+        # Assignment (=, *=, /=, +=, -=, %=, ^=, :=)
+        'EQUALS', 'MULEQUALS', 'DIVEQUALS', 'PLUSEQUALS', 'MINUSEQUALS', 'MODEQUALS', 'POWEQUALS', 'WALRUS',
 
         # Increment/Decrement (++, --)
         'PLUSPLUS', 'MINUSMINUS',
@@ -65,6 +65,8 @@ class Lexer:
     t_DIVEQUALS = r'/='
     t_PLUSEQUALS = r'\+='
     t_MINUSEQUALS = r'-='
+    t_MODEQUALS = r'\%='
+    t_POWEQUALS = r'\^='
     t_WALRUS = r'\:='
 
     # Delimiters
