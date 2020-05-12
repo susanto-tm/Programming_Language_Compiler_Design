@@ -8,8 +8,9 @@ class Lexer:
         ('string', 'inclusive'),
     )
     reserved = (
-        'AND', 'BREAK', 'CASE', 'CONTINUE', 'DEFAULT', 'ELSE', 'FOR', 'FALSE', 'FLOAT', 'FROM', 'FUNC', 'INT', 'IF',
-        'INTEGRATE', 'LET', 'LEN', 'NOT', 'OR', 'PRINT', 'RETURN', 'RANGE', 'SWITCH', 'STRING', 'TO', 'TRUE', 'TYPE',
+        'AND', 'ATAN', 'ACOS', 'ASIN', 'BREAK', 'CASE', 'COS', 'COSH', 'CONTINUE', 'DEFAULT', 'ELSE', 'FOR',
+        'FALSE', 'FLOAT', 'FROM', 'FUNC', 'INT', 'IF', 'INTEGRATE', 'LET', 'LEN', 'NOT', 'OR', 'PRINT', 'RETURN',
+        'RANGE', 'SWITCH', 'STRING', 'SIN', 'SINH', 'TO', 'TRUE', 'TYPE', 'TAN', 'TANH',
     )
 
     tokens = reserved + (

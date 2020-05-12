@@ -7,7 +7,9 @@ from the "eval" method. A list of all the nodes is stored in its parameters and
 evaluated based on control flow.
 """
 
-DEBUG_MODE = True
+import math_functions
+
+DEBUG_MODE = False
 
 symbols = {'global': {}, 'local': {}}  # holds symbols for variables
 state = ["global"]  # a stack that holds current variable state and scope
@@ -34,6 +36,7 @@ class AST:
 
     def eval(self):
         if self.action == 'eval':
+            math_functions.setup()
             debug("BEGIN EXECUTION", "Params:", self.param)
             for node in self.param:
                 self.visit(node)
@@ -440,6 +443,18 @@ class AST:
                 raise TypeError(f"object of type '{type(expr)}' has no len()")
             else:
                 return len(expr)
+        elif node.action == 'trig':
+            debug("TRIG FUNCTION", node, node.action, node.param)
+            args = []
+            for param in node.param[1]:
+                args.append(self.visit(param))
+
+            if node.param[0] in ['asin', 'acos', 'atan']:
+                trig_func = math_functions.Math(action='Trig-inv', param=args).exec()
+            else:
+                trig_func = math_functions.Math(action='Trig-angle', param=args).exec()
+
+            return getattr(trig_func, node.param[0])
 
     def visit_FuncDecl(self, node):
         if node.action == 'func_block':

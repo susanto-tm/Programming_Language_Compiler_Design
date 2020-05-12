@@ -1,10 +1,11 @@
-// Recursion
-// Factorial
-func fact(let n) {
-    if n == 1 {
-        return 1;
+func hashtag(let i, let j) {
+    if i <= 0 or i > j {
+        return 0;
     }
-    return n * fact(n - 1);
+
+    print(i * "#");
+
+    hashtag(i - 1, j);
 }
 
-print(fact(3));
+hashtag(3, 4);

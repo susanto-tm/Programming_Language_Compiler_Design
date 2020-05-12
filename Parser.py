@@ -285,6 +285,21 @@ class Parser:
         """
         p[0] = FuncCall(action='len', param=p[3])
 
+    def p_func_call_trig(self, p):
+        """
+        expr : SIN LPAREN expr_list RPAREN
+             | COS LPAREN expr_list RPAREN
+             | TAN LPAREN expr_list RPAREN
+             | ASIN LPAREN expr_list RPAREN
+             | ACOS LPAREN expr_list RPAREN
+             | ATAN LPAREN expr_list RPAREN
+             | SINH LPAREN expr_list RPAREN
+             | COSH LPAREN expr_list RPAREN
+             | TANH LPAREN expr_list RPAREN
+        """
+        debug("TRIG FUNCTION", p[1], p[3])
+        p[0] = FuncCall(action='trig', param=[p[1], p[3]])
+
     def p_cond_list(self, p):
         """
         cond_list : expr %prec COND
