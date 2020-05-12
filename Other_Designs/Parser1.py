@@ -1,7 +1,7 @@
 import ply.yacc as yacc
 from Lexer import Lexer
-from Compiler2 import AST
-import Compiler2
+from Other_Designs.Compiler2 import AST
+from Other_Designs import Compiler2
 
 DEBUG_MODE = True
 astPrec = []

@@ -1,4 +1,6 @@
-import ply.lex as lex
+import lex_yacc.lex as lex
+
+DEBUG_MODE = False
 
 
 class Lexer:
@@ -7,7 +9,7 @@ class Lexer:
     )
     reserved = (
         'AND', 'BREAK', 'CASE', 'CONTINUE', 'DEFAULT', 'ELSE', 'FOR', 'FALSE', 'FLOAT', 'FROM', 'FUNC', 'INT', 'IF',
-        'INTEGRATE', 'LET', 'NOT', 'OR', 'PRINT', 'RETURN', 'RANGE', 'SWITCH', 'STRING', 'TO', 'TRUE', 'TYPE', 'WHILE',
+        'INTEGRATE', 'LET', 'LEN', 'NOT', 'OR', 'PRINT', 'RETURN', 'RANGE', 'SWITCH', 'STRING', 'TO', 'TRUE', 'TYPE',
     )
 
     tokens = reserved + (
@@ -133,6 +135,7 @@ class Lexer:
 
     # Build the lexer
     def build(self, **kwargs):
+        global SHOW_LEX, DEBUG_MODE
         self.lexer = lex.lex(module=self, **kwargs)
 
     # Pass input and test lexer

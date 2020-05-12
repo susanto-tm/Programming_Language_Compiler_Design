@@ -1,6 +1,6 @@
 import ply.yacc as yacc
 from Lexer import Lexer
-from Compiler2 import AST
+from Other_Designs.Compiler2 import AST
 
 DEBUG_MODE = True
 

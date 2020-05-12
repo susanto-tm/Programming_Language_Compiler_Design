@@ -1,9 +1,9 @@
-import ply.yacc as yacc
+import lex_yacc.yacc as yacc
 from Lexer import Lexer
 from AST import *
 
 astList = []
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 
 class Parser:
@@ -91,7 +91,6 @@ class Parser:
             debug("Assignment", p[2])
             p[0] = Variable(action='assign', param=[p[2], Literal(action='INTCONST', param=0)])
 
-
     def p_reassign(self, p):
         """
         statement : IDENTIFIER EQUALS expr
@@ -122,22 +121,37 @@ class Parser:
         """
         p[0] = List(action='assign', param=[p[1], p[3], p[6]])
 
-    def p_function_call(self, p):
+    def p_func_call_statement(self, p):
         """
-        statement : IDENTIFIER LPAREN expr_list RPAREN
+        statement : func_call
         """
-        p[0] = FuncCall(action='exec', param=[p[1], p[3]])
+        p[0] = p[1]
+
+    def p_func_math_statement(self, p):
+        """
+        statement : IDENTIFIER LPAREN expr_list RPAREN EQUALS expr
+        """
+        p[0] = FuncDecl(action='func_math', param=[p[1], p[3], [p[6]]])
+
+    def p_return_statement(self, p):
+        """
+        statement : RETURN expr_list
+        """
+        p[0] = ReturnStmt(action='return_stmt', param=p[2])
 
     def p_expr_list(self, p):
         """
         expr_list : expr
                   | cond_list
                   | expr_list COMMA expr
+                  | empty
         """
         if len(p) > 2:
             p[0] = p[1] + [p[3]]
-        else:
+        elif p[1] is not None:
             p[0] = [p[1]]
+        else:
+            p[0] = p[1]
 
     def p_assign_expr(self, p):
         """
@@ -234,12 +248,6 @@ class Parser:
             p[0] = List(action='slice', param=[p[1], p[3], p[5],
                                                Literal(action='INTCONST', param=1)])
 
-    def p_function_line(self, p):
-        """
-        func_line : FUNC IDENTIFIER LPAREN expr_list RPAREN LBRACE basic_block RBRACE
-        """
-        p[0] = FuncDecl(action='func_block', param=[p[2], p[4], p[7]])
-
     def p_boolean(self, p):
         """
         expr : TRUE
@@ -264,6 +272,18 @@ class Parser:
         expr : incr_decr
         """
         p[0] = p[1]
+
+    def p_func_call_expr(self, p):
+        """
+        expr : func_call
+        """
+        p[0] = p[1]
+
+    def p_func_call_len(self, p):
+        """
+        expr : LEN LPAREN expr RPAREN
+        """
+        p[0] = FuncCall(action='len', param=p[3])
 
     def p_cond_list(self, p):
         """
@@ -322,11 +342,26 @@ class Parser:
         else:
             p[0] = Range(action='range_decl', param=[p[1], p[3], Literal(action='INTCONST', param=1)])
 
+    def p_function_line(self, p):
+        """
+        func_line : FUNC IDENTIFIER LPAREN expr_list RPAREN LBRACE basic_block RBRACE
+        """
+        p[0] = FuncDecl(action='func_block', param=[p[2], p[4], p[7]])
+
+    def p_function_call(self, p):
+        """
+        func_call : IDENTIFIER LPAREN expr_list RPAREN
+        """
+        p[0] = FuncCall(action='exec', param=[p[1], p[3]])
+
     def p_empty(self, p):
         """
         empty :
         """
         pass
+
+    def p_error(self, p):
+        raise SyntaxError("invalid syntax")
 
     def build(self):
         self.parser = yacc.yacc(module=self)

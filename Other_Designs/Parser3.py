@@ -1,7 +1,7 @@
 import ply.yacc as yacc
 from Lexer import Lexer
-from Compiler import *
-import ast
+from Other_Designs.Compiler import *
+
 
 class Parser:
     tokens = Lexer.tokens

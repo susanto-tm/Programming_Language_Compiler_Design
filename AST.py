@@ -7,11 +7,13 @@ from the "eval" method. A list of all the nodes is stored in its parameters and
 evaluated based on control flow.
 """
 
-DEBUG_MODE = True
+DEBUG_MODE = False
+
 symbols = {'global': {}, 'local': {}}  # holds symbols for variables
 state = ["global"]  # a stack that holds current variable state and scope
 function_state = []  # a stack that holds current scope of functions
-scope_needed = ['IfElseStmt', 'IfStmt', 'ElseStmt', 'ForStmt']  # stores different states for when a scope is needed
+# stores different states for when a scope is needed
+scope_needed = ['IfElseStmt', 'IfStmt', 'ElseStmt', 'ForStmt', 'ReturnStmt']
 
 
 class Node:
@@ -108,7 +110,10 @@ class AST:
     def visit_Print(self, node):
         debug("PRINT", node, node.action, node.param)
 
-        print(' '.join(str(self.visit(x)) for x in list(node.param)))
+        if node.param is None:
+            print()
+        else:
+            print(' '.join(str(self.visit(x)) for x in list(node.param)))
 
     def visit_Variable(self, node):
         debug("VARIABLE", node, node.action, node.param, symbols)
@@ -125,6 +130,7 @@ class AST:
             rhs = self.visit(node.param[1])
             if lhs in symbols['global'] or lhs in [local_symbols[scope] for scope in state[1:global_idx]]:
                 raise NameError(f"name '{node.param[0]}' already exist")
+            debug("ASSIGNMENT STATE", state)
             if state[0] in local_symbols:
                 # local key only exists if it is added in different scopes
                 local_symbols[state[0]][lhs] = rhs
@@ -164,9 +170,10 @@ class AST:
             if identifier in symbols['global']:
                 return symbols['global'][identifier]
             elif identifier not in symbols['global']:
-                print("ARGUMENT", state[:global_idx])
+                debug("ARGUMENT", state[:global_idx])
                 for scope in state[:global_idx]:  # move up a scope and check if variable exists
                     if identifier in local_symbols[scope]:
+                        debug("GETTING FROM", scope, identifier)
                         return local_symbols[scope][identifier]
 
             raise NameError(f"name '{identifier}' not defined")
@@ -237,40 +244,64 @@ class AST:
 
     def visit_IfElseBlock(self, node):
         # combines both if and else blocks to manage the control flow
-        if not self.visit(node.param[0]):
-            self.visit(node.param[1])
+        returned = False
+        ret, if_branch = self.visit(node.param[0])
+        if not if_branch:
+            ret, returned = self.visit(node.param[1])
+
+        debug("IF STMT RET", ret)
+
+        if ret is not None:
+            return ret, returned
 
     def visit_IfStmt(self, node):
         local_symbols = self.determine_local()
         # holds evaluation of an if statement and returns if an else will be evaluated
         # node.param[0] holds the condition and node.param[1] holds the basic block
         debug("IF STATEMENT", node, node.action, node.param)
-        evaluated = False
+        evaluated, ret, returned = False, None, False
         self.add_scope('if', local_symbols)
 
         if self.visit(node.param[0]):
             # since operations are basic blocks, they are always in list format
             for actions in node.param[1]:
-                self.visit(actions)
+                if actions.__class__.__name__ in scope_needed:
+                    ret, returned = self.visit(actions)
+                else:
+                    self.visit(actions)
+
+                if returned:
+                    debug("RET FROM IF", ret, returned, actions)
+                    break
 
             evaluated = True  # for if else statements, method will decide whether else is needed
 
         self.reset_scope(local_symbols)
 
-        return False if not evaluated else True
+        return (ret, False) if not evaluated else (ret, True)
 
     def visit_ElseStmt(self, node):
         local_symbols = self.determine_local()
         debug("ELSE STATEMENT", node, node.action, node.param)
         self.add_scope('else', local_symbols)
+        ret, returned = None, False
 
         if isinstance(node.param, list):
             for actions in node.param:
-                self.visit(actions)
+                if actions.__class__.__name__ in scope_needed:
+                    ret, returned = self.visit(actions)
+                else:
+                    self.visit(actions)
+
+                if returned:
+                    break
+
         else:
             self.visit(node.param)
 
         self.reset_scope(local_symbols)
+
+        return ret, returned
 
     def visit_Range(self, node):
         debug("RANGE", node, node.action, node.param)
@@ -295,7 +326,7 @@ class AST:
         # Accepts param = [iterating symbol, range of iteration, block to execute]
         local_symbols = self.determine_local()
         debug("FOR STATEMENT", node, node.action, node.param)
-        loop = True
+        loop, ret, returned = True, None, False
         self.add_scope('for_loop', local_symbols)
         loop_range = self.visit(node.param[1])
         iter_symbol = node.param[0]
@@ -312,9 +343,17 @@ class AST:
                 debug("LOOP ITER", i, loop_range, symbols)
                 local_symbols[state[0]][iter_symbol] = i
                 for stmt in block:
-                    self.visit(stmt)  # each new scope is handled by those that need a new scope
+                    ret, returned = self.visit(stmt)  # each new scope is handled by those that need a new scope
+                    debug("RET FROM LOOP", ret, stmt, returned)
+                    if stmt.__class__.__name__ == 'ReturnStmt' or returned:
+                        debug("LOOP")
+                        break
+                if returned:
+                    break
 
         self.reset_scope(local_symbols)
+
+        return ret, returned
 
     def visit_WhileStmt(self, node):
         # Accepts param = [conditions for while, block to execute]
@@ -330,11 +369,29 @@ class AST:
 
     def visit_FuncBlock(self, node):
         # Called from FuncCall, params = [IDENTIFIER, exec orders]
-        debug("FUNCTION BLOCK EXECUTION", node, node.action, node.param)
+        debug("FUNCTION BLOCK EXECUTION", node, node.action, node.param, state)
+        state.insert(0, "local")
+        debug("FUNCBLOCK", state)
+        ret_argument, returned = None, False
         for actions in node.param[1]:
-            self.visit(actions)
+            debug("ACTIONS", actions, actions.param)
+            if actions.__class__.__name__ in scope_needed:
+                ret_argument, returned = self.visit(actions)
+            else:
+                ret_argument = self.visit(actions)
+            debug("RET ARGUMENT", ret_argument, actions)
+            if actions.__class__.__name__ == 'ReturnStmt' or returned:
+                break
 
-        self.reset_scope_func_decl()
+        debug("STATE IN FUNCBLOCK 1", ret_argument)
+        self.reset_scope_func_decl()  # only removes local and param since local is just introduced
+        state.pop(0)  # removes func_scop
+
+        debug("RETURN STMT", ret_argument)
+
+        if ret_argument is not None:
+            debug("STATE IN FUNCBLOCK", state)
+            return ret_argument
 
     def visit_FuncCall(self, node):
         debug("FUNCTION CALL", node, node.action, node.param)
@@ -343,7 +400,7 @@ class AST:
             func_scope = self.add_func_scope(node.param[0])  # add scope and get key for FuncDecl
             func = symbols['global'][func_scope]  # get function object
             func_local = symbols['local'][func_scope]['params']
-            update_params = [self.visit(param) for param in node.param[1]]
+            update_params = [self.visit(param) for param in node.param[1]] if node.param[1] is not None else []
 
             # Check for the number of positional arguments
             if len(update_params) < len(func_local.keys()):
@@ -363,22 +420,66 @@ class AST:
                 symbols['global'][func_scope] = FuncBlock(action='func_block', param=[func_scope, exec_orders])
 
             # execute function
-            self.visit(symbols['global'][func_scope])
+            ret_stmt = self.visit(symbols['global'][func_scope])
+            debug("RETURNING FROM CALL", ret_stmt)
+            if ret_stmt is not None:
+                debug("CURRENT STATE", state)
+                return ret_stmt
+        elif node.action == 'len':
+            # Accepts a function call in the form len(expr) : params = [expr]
+            expr = self.visit(node.param)
+            if isinstance(expr, (int, float)):
+                raise TypeError(f"object of type '{type(expr)}' has no len()")
+            else:
+                return len(expr)
 
     def visit_FuncDecl(self, node):
-        # Accepts function block, param = [IDENTIFIER, expr_list, execution block]
-        debug("FUNCTION DECLARE", node, node.action, node.param)
-        # func_states = list(filter(lambda a: a.startswith('func'), symbols['local'].keys()))
-        func_scope = self.add_func_scope(node.param[0])
-        symbols['local'][func_scope] = {'params': {}}
+        if node.action == 'func_block':
+            # Accepts function block, param = [IDENTIFIER, expr_list, execution block]
+            debug("FUNCTION DECLARE", node, node.action, node.param)
+            # func_states = list(filter(lambda a: a.startswith('func'), symbols['local'].keys()))
+            func_scope = self.add_func_scope(node.param[0])
+            symbols['local'][func_scope] = {'params': {}, 'local': {}}
 
-        for var_param in node.param[1]:
-            self.visit(var_param)
+            if node.param[1] is not None:
+                for var_param in node.param[1]:
+                    debug("VAR_PARAM", var_param.action)
+                    self.visit(var_param)
 
-        symbols['global'][func_scope] = node
-        print("UPDATED SYMBOLS", symbols, symbols['global'][func_scope].param)
+            symbols['global'][func_scope] = node
+            debug("UPDATED SYMBOLS", symbols, symbols['global'][func_scope].param)
 
-        self.reset_scope_func_decl()
+            self.reset_scope_func_decl()
+        elif node.action == 'func_math':
+            # Accepts function in the form of ID(input_var, input_var)
+            debug("FUNCTION DECLARE", node, node.action, node.param)
+            func_scope = self.add_func_scope(node.param[0])
+            symbols['local'][func_scope] = {'params': {}, 'local': {}}
+
+            if node.param[1] is None:
+                raise TypeError(f"{node.param[0]}() expects at least 1 positional argument")
+
+            # Resolve get Variables and assign instead
+            args = node.param[1]
+            for arg in args:
+                variable = arg.param.param
+                self.visit(Variable(action='assign', param=[variable, Literal(action="INTCONST", param=0)]))
+
+            symbols['global'][func_scope] = node
+            debug("UPDATED SYMBOLS", symbols)
+
+            self.reset_scope_func_decl()
+
+    def visit_ReturnStmt(self, node):
+        # Accepts in the form RETURN expr_list : params = [expr_list] : possible future support for multiple returns
+        debug("RETURNING", node, node.action, node.param)
+        ret_args = []
+        for args in node.param:
+            ret_args.append(self.visit(args))
+
+        if len(ret_args) == 1:
+            debug("RETURN STMT FINAL", ret_args[0])
+            return ret_args[0], True
 
     def add_scope(self, scope, location):
         scope_number = 0  # the higher the number, the deeper the scope
@@ -395,9 +496,11 @@ class AST:
 
     def add_func_scope(self, scope):
         new_state = 'func_' + scope
+        debug("INITIAL SCOPE", state)
         state.insert(0, new_state)
         state.insert(0, 'params')
         function_state.insert(0, new_state)
+        debug("ADDING FUNC SCOPE", state)
 
         return new_state
 
@@ -408,11 +511,13 @@ class AST:
             return symbols['local']
 
     def reset_scope_func_decl(self):
+        debug("RESETING FUNC SCOPE", state, function_state)
         state.pop(0)
         state.pop(0)
         function_state.pop(0)
 
     def reset_scope(self, location):
+        debug("RESETING SCOPE", location)
         location.pop(state[0])
         state.pop(0)
 
@@ -507,6 +612,11 @@ class FuncCall(Node):
 
 
 class FuncBlock(Node):
+    def __init__(self, action, param):
+        super().__init__(action, param)
+
+
+class ReturnStmt(Node):
     def __init__(self, action, param):
         super().__init__(action, param)
 
