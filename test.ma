@@ -1,6 +1,10 @@
-// Bubble Sort
-f(x) = 2*x + 1;
+// Recursion
+// Factorial
+func fact(let n) {
+    if n == 1 {
+        return 1;
+    }
+    return n * fact(n - 1);
+}
 
-print(f(1));
-
-
+print(fact(3));

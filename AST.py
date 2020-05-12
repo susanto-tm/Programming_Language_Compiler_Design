@@ -7,7 +7,7 @@ from the "eval" method. A list of all the nodes is stored in its parameters and
 evaluated based on control flow.
 """
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 symbols = {'global': {}, 'local': {}}  # holds symbols for variables
 state = ["global"]  # a stack that holds current variable state and scope
@@ -170,11 +170,19 @@ class AST:
             if identifier in symbols['global']:
                 return symbols['global'][identifier]
             elif identifier not in symbols['global']:
-                debug("ARGUMENT", state[:global_idx])
-                for scope in state[:global_idx]:  # move up a scope and check if variable exists
-                    if identifier in local_symbols[scope]:
-                        debug("GETTING FROM", scope, identifier)
-                        return local_symbols[scope][identifier]
+                debug("ARGUMENT", state[:global_idx],symbols['local'], local_symbols, global_idx, state)
+                if len(function_state) <= 1:
+                    for scope in state[:global_idx]:  # move up a scope and check if variable exists
+                        if identifier in local_symbols[scope]:
+                            debug("GETTING FROM", scope, identifier)
+                            return local_symbols[scope][identifier]
+                else:
+                    # Get function's parameter where it is calling from only see from 2 function calls
+                    # since we could not get a parameter from 2 previous function scopes
+                    for func in function_state[:2]:
+                        func_param_from = symbols['local'][func]['params']
+                        if identifier in func_param_from:
+                            return func_param_from[identifier]
 
             raise NameError(f"name '{identifier}' not defined")
 
