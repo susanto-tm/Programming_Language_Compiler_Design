@@ -1,8 +1,10 @@
-func fact(let n) {
-    if n == 1 {
-        return 1;
+func hashtags(let i, let j) {
+    if i <= 0 or i > j{
+        return;
     }
 
-    return n * fact(n - 1);
+    print(i * "#");
+    hashtags(i + 1, j);
+    print(i * "#");
 }
-print(fact(10));
+hashtags(3, 9);

@@ -9,13 +9,13 @@ evaluated based on control flow.
 
 import math_functions
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 symbols = {'global': {}, 'local': {}}  # holds symbols for variables
 state = ["global"]  # a stack that holds current variable state and scope
 function_state = []  # a stack that holds current scope of functions !!! Only one way recursion works, not backtracking
 # stores different states for when a scope is needed
-scope_needed = ['IfElseStmt', 'IfStmt', 'ElseStmt', 'ForStmt', 'ReturnStmt']
+scope_needed = ['IfElseBlock', 'IfStmt', 'ElseStmt', 'ForStmt', 'ReturnStmt']
 
 
 class Node:
@@ -173,16 +173,18 @@ class AST:
             if identifier in symbols['global']:
                 return symbols['global'][identifier]
             elif identifier not in symbols['global']:
-                debug("ARGUMENT", state[:global_idx],symbols['local'], local_symbols, global_idx, state)
+                debug("ARGUMENT", state[:global_idx], symbols['local'], local_symbols, global_idx, state)
                 if len(function_state) <= 1:
                     for scope in state[:global_idx]:  # move up a scope and check if variable exists
                         if identifier in local_symbols[scope]:
                             debug("GETTING FROM", scope, identifier)
                             return local_symbols[scope][identifier]
                 else:
-                    # Get function's parameter where it is calling from only see from 2 function calls
-                    # since we could not get a parameter from 2 previous function scopes
-                    for func in function_state[:2]:
+                    # Get function's parameter from previous function calls
+                    # Start at 1 if updating params since recursive calls get updated params from previous calls
+                    # Start at 0 if in local space where variables are within current space
+                    start_index = 0 if state[0] != 'params' else 1
+                    for func in function_state[start_index:]:
                         func_param_from = symbols['local'][func]['params']
                         if identifier in func_param_from:
                             return func_param_from[identifier]
@@ -261,6 +263,9 @@ class AST:
             ret, returned = self.visit(node.param[1])
 
         debug("IF STMT RET", ret)
+
+        if if_branch and ret is not None:
+            returned = True
 
         if ret is not None:
             return ret, returned
@@ -405,21 +410,39 @@ class AST:
             return ret_argument
 
     def visit_FuncCall(self, node):
-        debug("FUNCTION CALL", node, node.action, node.param)
+        debug("FUNCTION CALL", node, node.action, node.param, function_state)
         if node.action == 'exec':
             # Accepts function execution FuncID(expr_list), param = [IDENTIFIER, expr_list]
-            func_scope = self.add_func_scope(node.param[0])  # add scope and get key for FuncDecl
-            func = symbols['global'][func_scope]  # get function object
-            func_local = symbols['local'][func_scope]['params']
-            update_params = [self.visit(param) for param in node.param[1]] if node.param[1] is not None else []
+            # Search if it is a first call with _0 tail
+            func_scope = 'func_' + node.param[0]
+            new_func_scope = initial_func = func_scope + "_0"
+            if initial_func in function_state:
+                # If it is a recursive call
+                debug("ADD SAME FUNC", func_scope)
+                scope_number = 1
+                while new_func_scope in function_state:
+                    new_func_scope = func_scope + f"_{scope_number}"
+                    scope_number += 1
+                debug("ADDING FUNC SCOPE 2", func_scope)
+                func_scope = self.add_func_scope(new_func_scope)  # add scope and get key for FuncDecl
 
-            # Check for the number of positional arguments
-            if len(update_params) < len(func_local.keys()):
-                raise TypeError(f"{node.param[0]}() missing {len(func_local) - len(update_params)} required "
-                                f"positional argument")
-            elif len(update_params) > len(func_local.keys()):
-                raise TypeError(f"{node.param[0]}() takes {len(func_local.keys())} positional arguments but "
-                                f"{len(update_params)} were given")
+                # Add new local instance of function
+                symbols['local'][func_scope] = {'params': {}, 'local': {}}
+                if symbols['local'][initial_func]['params'] is not None:
+                    for key, val in symbols['local'][initial_func]['params'].items():
+                        symbols['local'][func_scope]['params'][key] = val
+
+                func = symbols['global'][initial_func]
+                func_local = symbols['local'][func_scope]['params']
+                update_params = [self.visit(param) for param in node.param[1]] if node.param[1] is not None else []
+                debug("UPDATING NEW SCOPE", update_params)
+                self.check_positional_arguments(update_params, func_local, node)
+
+            else:
+                func_scope = self.add_func_scope(new_func_scope)
+                func = symbols['global'][func_scope]  # get function object
+                func_local = symbols['local'][func_scope]['params']
+                update_params = [self.visit(param) for param in node.param[1]] if node.param[1] is not None else []
 
             # update the local parameters in the local function symbols
             for i, key in enumerate(func_local.keys()):
@@ -431,11 +454,15 @@ class AST:
                 symbols['global'][func_scope] = FuncBlock(action='func_block', param=[func_scope, exec_orders])
 
             # execute function
+            current_scope, func_scope = func_scope, initial_func
             ret_stmt = self.visit(symbols['global'][func_scope])
             debug("RETURNING FROM CALL", ret_stmt)
+
             if ret_stmt is not None:
                 debug("CURRENT STATE", state)
+                symbols['local'].pop(current_scope)
                 return ret_stmt
+
         elif node.action == 'len':
             # Accepts a function call in the form len(expr) : params = [expr]
             expr = self.visit(node.param)
@@ -460,8 +487,8 @@ class AST:
         if node.action == 'func_block':
             # Accepts function block, param = [IDENTIFIER, expr_list, execution block]
             debug("FUNCTION DECLARE", node, node.action, node.param)
-            # func_states = list(filter(lambda a: a.startswith('func'), symbols['local'].keys()))
-            func_scope = self.add_func_scope(node.param[0])
+            # initialize function scope with 0 for very first call
+            func_scope = self.add_func_scope('func_' + node.param[0] + "_0")
             symbols['local'][func_scope] = {'params': {}, 'local': {}}
 
             if node.param[1] is not None:
@@ -473,6 +500,7 @@ class AST:
             debug("UPDATED SYMBOLS", symbols, symbols['global'][func_scope].param)
 
             self.reset_scope_func_decl()
+
         elif node.action == 'func_math':
             # Accepts function in the form of ID(input_var, input_var)
             debug("FUNCTION DECLARE", node, node.action, node.param)
@@ -508,6 +536,15 @@ class AST:
         else:
             return None, True
 
+    def check_positional_arguments(self, update_params, func_local, node):
+        # Check for the number of positional arguments
+        if len(update_params) < len(func_local.keys()):
+            raise TypeError(f"{node.param[0]}() missing {len(func_local) - len(update_params)} required "
+                            f"positional argument")
+        elif len(update_params) > len(func_local.keys()):
+            raise TypeError(f"{node.param[0]}() takes {len(func_local.keys())} positional arguments but "
+                            f"{len(update_params)} were given")
+
     def add_scope(self, scope, location):
         scope_number = 0  # the higher the number, the deeper the scope
         new_state = scope + str(scope_number)
@@ -522,14 +559,13 @@ class AST:
         return new_state
 
     def add_func_scope(self, scope):
-        new_state = 'func_' + scope
         debug("INITIAL SCOPE", state)
-        state.insert(0, new_state)
+        state.insert(0, scope)
         state.insert(0, 'params')
-        function_state.insert(0, new_state)
+        function_state.insert(0, scope)
         debug("ADDING FUNC SCOPE", state)
 
-        return new_state
+        return scope
 
     def determine_local(self):
         if len(function_state) != 0:
