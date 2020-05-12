@@ -1,11 +1,8 @@
-func hashtag(let i, let j) {
-    if i <= 0 or i > j {
-        return 0;
+func fact(let n) {
+    if n == 1 {
+        return 1;
     }
 
-    print(i * "#");
-
-    hashtag(i - 1, j);
+    return n * fact(n - 1);
 }
-
-hashtag(3, 4);
+print(fact(10));

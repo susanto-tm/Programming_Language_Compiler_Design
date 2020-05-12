@@ -9,11 +9,11 @@ evaluated based on control flow.
 
 import math_functions
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 symbols = {'global': {}, 'local': {}}  # holds symbols for variables
 state = ["global"]  # a stack that holds current variable state and scope
-function_state = []  # a stack that holds current scope of functions
+function_state = []  # a stack that holds current scope of functions !!! Only one way recursion works, not backtracking
 # stores different states for when a scope is needed
 scope_needed = ['IfElseStmt', 'IfStmt', 'ElseStmt', 'ForStmt', 'ReturnStmt']
 
@@ -496,13 +496,17 @@ class AST:
     def visit_ReturnStmt(self, node):
         # Accepts in the form RETURN expr_list : params = [expr_list] : possible future support for multiple returns
         debug("RETURNING", node, node.action, node.param)
-        ret_args = []
-        for args in node.param:
-            ret_args.append(self.visit(args))
 
-        if len(ret_args) == 1:
-            debug("RETURN STMT FINAL", ret_args[0])
-            return ret_args[0], True
+        if node.param is not None:
+            ret_args = []
+            for args in node.param:
+                ret_args.append(self.visit(args))
+
+            if len(ret_args) == 1:
+                debug("RETURN STMT FINAL", ret_args[0])
+                return ret_args[0], True
+        else:
+            return None, True
 
     def add_scope(self, scope, location):
         scope_number = 0  # the higher the number, the deeper the scope

@@ -261,6 +261,12 @@ class Parser:
 
         p[0] = Literal(action='BOOLEAN', param=bool(expr))
 
+    def p_null(self, p):
+        """
+        expr : NULL
+        """
+        p[0] = Literal(action='NULL', param=None)
+
     def p_expr_paren(self, p):
         """
         expr : LPAREN expr RPAREN
