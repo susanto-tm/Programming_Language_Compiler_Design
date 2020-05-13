@@ -306,6 +306,13 @@ class Parser:
         debug("TRIG FUNCTION", p[1], p[3])
         p[0] = FuncCall(action='trig', param=[p[1], p[3]])
 
+    def p_func_call_integrate(self, p):
+        """
+        expr : INTEGRATE LPAREN expr_list RPAREN
+        """
+        debug("INTEGRATION", p[1], p[3])
+        p[0] = FuncCall(action='integral', param=[p[1], p[3]])
+
     def p_cond_list(self, p):
         """
         cond_list : expr %prec COND

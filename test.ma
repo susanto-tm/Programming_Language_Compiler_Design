@@ -1,10 +1,3 @@
-func hashtags(let i, let j) {
-    if i <= 0 or i > j{
-        return;
-    }
+let k = integrate('2*x^2 + 2', 'x', 0, 1);
 
-    print(i * "#");
-    hashtags(i + 1, j);
-    print(i * "#");
-}
-hashtags(3, 9);
+print(k);

@@ -8,8 +8,11 @@ CORDIC algorithm translated from C (Michael Bertrand)
 """
 
 import math
+from sympy import *
+import re
 
 math_funcs = {}  # contains precomputed setup holding objects to each algorithm
+funcs = ['Trig', 'Calculus']
 
 
 class MathFunc:
@@ -48,6 +51,30 @@ class Trig(MathFunc):
             self.acos = math.acos(param[0] / param[1])
 
 
+class Calculus(MathFunc):
+    def __init__(self):
+        self.__expr = None
+        self.__symbol = None
+        self.operation = None
+        self.function = None
+
+    def eval(self, expression, param, operation):
+        self.__expr = sympify(re.sub(r'\^', r'**', expression))
+        self.operation = operation
+
+        if self.operation == 'def_int':
+            self.__symbol = symbols(param[0])
+            lower_bound = param[1]
+            upper_bound = param[2]
+
+            # Already contains
+            self.function = integrate(self.__expr, (self.__symbol, lower_bound, upper_bound))
+
+        elif self.operation == 'indef_int':
+            self.__symbol = symbols(param)
+            self.function = integrate(self.__expr, self.__symbol)
+
+
 class Math:
     def __init__(self, action, param):
         self.action = action
@@ -62,12 +89,21 @@ class Math:
                 inverse = True
             func.eval([self.param[0], self.param[1]], inverse=inverse)
             return func
+        elif self.action == 'def_int' or self.action == 'indef_int':
+            # Accepts indef_int', params = [expression, (symbol, from, to)] or 'def_int', params = [expression, symbol]
+            func = math_funcs['Calculus']
+            if self.action == 'indef_int':
+                func.eval(self.param[0], self.param[1], 'indef_int')
+
+            elif self.action == 'def_int':
+                func.eval(self.param[0], (self.param[1], self.param[2], self.param[3]), 'def_int')
+
+            return func
 
 
 def setup():
     import sys, inspect
-    for cls in inspect.getmembers(sys.modules[__name__]):
-        if inspect.isclass(cls[1]) and cls[0] != "Math" and cls[0] != "MathFunc":
-            add_func = cls[1]()
-            add_func.setup()
-            math_funcs[cls[0]] = add_func
+    for cls in funcs:
+        add_func = eval(cls + '()')
+        add_func.setup()
+        math_funcs[cls] = add_func

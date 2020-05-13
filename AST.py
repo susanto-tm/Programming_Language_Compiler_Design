@@ -9,7 +9,7 @@ evaluated based on control flow.
 
 import math_functions
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 symbols = {'global': {}, 'local': {}}  # holds symbols for variables
 state = ["global"]  # a stack that holds current variable state and scope
@@ -401,7 +401,7 @@ class AST:
 
         debug("STATE IN FUNCBLOCK 1", ret_argument)
         self.reset_scope_func_decl()  # only removes local and param since local is just introduced
-        state.pop(0)  # removes func_scop
+        state.pop(0)  # removes func_scope
 
         debug("RETURN STMT", ret_argument)
 
@@ -428,10 +428,13 @@ class AST:
 
                 # Add new local instance of function
                 symbols['local'][func_scope] = {'params': {}, 'local': {}}
+
+                # Copy symbols from initial parameter to the new recursive function parameter
                 if symbols['local'][initial_func]['params'] is not None:
                     for key, val in symbols['local'][initial_func]['params'].items():
                         symbols['local'][func_scope]['params'][key] = val
 
+                # Resolve issues regarding function calls and get necessary scopes
                 func = symbols['global'][initial_func]
                 func_local = symbols['local'][func_scope]['params']
                 update_params = [self.visit(param) for param in node.param[1]] if node.param[1] is not None else []
@@ -439,10 +442,12 @@ class AST:
                 self.check_positional_arguments(update_params, func_local, node)
 
             else:
-                func_scope = self.add_func_scope(new_func_scope)
+                # Resolve issues regarding function calls and get necessary scopes
+                func_scope = self.add_func_scope(new_func_scope)  # add scope and get key for FuncDecl
                 func = symbols['global'][func_scope]  # get function object
                 func_local = symbols['local'][func_scope]['params']
                 update_params = [self.visit(param) for param in node.param[1]] if node.param[1] is not None else []
+                self.check_positional_arguments(update_params, func_local, node)
 
             # update the local parameters in the local function symbols
             for i, key in enumerate(func_local.keys()):
@@ -458,9 +463,10 @@ class AST:
             ret_stmt = self.visit(symbols['global'][func_scope])
             debug("RETURNING FROM CALL", ret_stmt)
 
+            symbols['local'].pop(current_scope)
+
             if ret_stmt is not None:
-                debug("CURRENT STATE", state)
-                symbols['local'].pop(current_scope)
+                debug("CURRENT STATE", state, symbols)
                 return ret_stmt
 
         elif node.action == 'len':
@@ -483,6 +489,36 @@ class AST:
 
             return getattr(trig_func, node.param[0])
 
+        elif node.action == 'integral':
+            debug("INTEGRATION FUNCTION", node, node.action, node.param)
+            args = []
+            for param in node.param[1]:
+                args.append(self.visit(param))
+            debug("INTEGRAL ARGS", args)
+            if len(args) > 2:
+                # Definite integral
+                integral = math_functions.Math(action='def_int', param=args).exec()
+            else:
+                # Indefinite Integral
+                integral = math_functions.Math(action='indef_int', param=args).exec()
+
+            debug("INTEGRAL FUNC SCOPE", symbols, function_state, state)
+            # Check if given in a function and get params
+            if len(args) <= 2:
+                if len(function_state) != 0:
+                    if args[1] in symbols['local'][function_state[0]]['params']:
+                        return integral.function.subs(args[1],
+                                                      symbols['local'][function_state[0]]['params'][args[1]]).evalf()
+                else:
+                    return str(integral.function) + ' + C'
+            else:
+                return integral.function.evalf()
+
+
+
+
+
+
     def visit_FuncDecl(self, node):
         if node.action == 'func_block':
             # Accepts function block, param = [IDENTIFIER, expr_list, execution block]
@@ -504,7 +540,7 @@ class AST:
         elif node.action == 'func_math':
             # Accepts function in the form of ID(input_var, input_var)
             debug("FUNCTION DECLARE", node, node.action, node.param)
-            func_scope = self.add_func_scope(node.param[0])
+            func_scope = self.add_func_scope('func_' + node.param[0] + '_0')
             symbols['local'][func_scope] = {'params': {}, 'local': {}}
 
             if node.param[1] is None:
