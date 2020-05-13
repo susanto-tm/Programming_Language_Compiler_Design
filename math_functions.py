@@ -8,8 +8,10 @@ CORDIC algorithm translated from C (Michael Bertrand)
 """
 
 import math
-from sympy import *
 import re
+from sympy.core import sympify, symbols, diff
+from sympy.integrals import integrate
+from sympy.utilities import lambdify
 
 math_funcs = {}  # contains precomputed setup holding objects to each algorithm
 funcs = ['Trig', 'Calculus']
@@ -67,12 +69,15 @@ class Calculus(MathFunc):
             lower_bound = param[1]
             upper_bound = param[2]
 
-            # Already contains
             self.function = integrate(self.__expr, (self.__symbol, lower_bound, upper_bound))
 
         elif self.operation == 'indef_int':
             self.__symbol = symbols(param)
             self.function = integrate(self.__expr, self.__symbol)
+
+        elif self.operation == 'deriv':
+            self.__symbol = symbols(param)
+            self.function = diff(self.__expr, self.__symbol)
 
 
 class Math:
@@ -100,9 +105,15 @@ class Math:
 
             return func
 
+        elif self.action == 'deriv':
+            # Accepts 'deriv', params = [expression, symbol]
+            func = math_funcs['Calculus']
+            func.eval(self.param[0], self.param[1], 'deriv')
+
+            return func
+
 
 def setup():
-    import sys, inspect
     for cls in funcs:
         add_func = eval(cls + '()')
         add_func.setup()

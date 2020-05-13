@@ -69,6 +69,7 @@ class Parser:
         line_statement : for_line
                        | while_line
                        | func_line
+                       | switch_line
         """
         p[0] = p[1]
 
@@ -138,6 +139,12 @@ class Parser:
         statement : RETURN expr_list
         """
         p[0] = ReturnStmt(action='return_stmt', param=p[2])
+
+    def p_break_statement(self, p):
+        """
+        statement : BREAK
+        """
+        p[0] = BreakStmt(action='break', param=p[1])
 
     def p_expr_list(self, p):
         """
@@ -313,6 +320,13 @@ class Parser:
         debug("INTEGRATION", p[1], p[3])
         p[0] = FuncCall(action='integral', param=[p[1], p[3]])
 
+    def p_func_call_derivative(self, p):
+        """
+        expr : DIFF LPAREN expr_list RPAREN
+        """
+        debug("DIFFERENTIATION", p[1], p[3])
+        p[0] = FuncCall(action='deriv', param=[p[1], p[3]])
+
     def p_cond_list(self, p):
         """
         cond_list : expr %prec COND
@@ -381,6 +395,36 @@ class Parser:
         func_call : IDENTIFIER LPAREN expr_list RPAREN
         """
         p[0] = FuncCall(action='exec', param=[p[1], p[3]])
+
+    def p_switch_line(self, p):
+        """
+        switch_line : SWITCH LPAREN expr RPAREN LBRACE case_list RBRACE
+        """
+        p[0] = SwitchStmt(action='switch', param=[p[3], p[6]])
+
+    def p_case_list(self, p):
+        """
+        case_list : case_block
+                  | case_list case_block
+        """
+        if len(p) > 2:
+            p[0] = p[1] + [p[2]]
+        else:
+            p[0] = [p[1]]
+
+    def p_switch_case(self, p):
+        """
+        case_block : CASE expr LBRACE basic_block RBRACE
+        """
+        debug("CASE BLOCK", p[1], p[2], p[4])
+        p[0] = CaseStmt(action='case', param=[p[2], p[4]])
+
+    def p_default_case(self, p):
+        """
+        case_block : DEFAULT LBRACE basic_block RBRACE
+        """
+        debug("DEFAULT CASE", p[1], p[3])
+        p[0] = DefaultStmt(action='default', param=p[3])
 
     def p_empty(self, p):
         """

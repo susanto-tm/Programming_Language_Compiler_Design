@@ -7,8 +7,6 @@ from the "eval" method. A list of all the nodes is stored in its parameters and
 evaluated based on control flow.
 """
 
-import math_functions
-
 DEBUG_MODE = True
 
 symbols = {'global': {}, 'local': {}}  # holds symbols for variables
@@ -36,7 +34,6 @@ class AST:
 
     def eval(self):
         if self.action == 'eval':
-            math_functions.setup()
             debug("BEGIN EXECUTION", "Params:", self.param)
             for node in self.param:
                 self.visit(node)
@@ -477,7 +474,9 @@ class AST:
             else:
                 return len(expr)
         elif node.action == 'trig':
+            import math_functions
             debug("TRIG FUNCTION", node, node.action, node.param)
+            math_functions.setup()  # increases performance only when needed
             args = []
             for param in node.param[1]:
                 args.append(self.visit(param))
@@ -490,7 +489,9 @@ class AST:
             return getattr(trig_func, node.param[0])
 
         elif node.action == 'integral':
+            import math_functions
             debug("INTEGRATION FUNCTION", node, node.action, node.param)
+            math_functions.setup()
             args = []
             for param in node.param[1]:
                 args.append(self.visit(param))
@@ -507,17 +508,30 @@ class AST:
             if len(args) <= 2:
                 if len(function_state) != 0:
                     if args[1] in symbols['local'][function_state[0]]['params']:
-                        return integral.function.subs(args[1],
-                                                      symbols['local'][function_state[0]]['params'][args[1]]).evalf()
+                        return integral.function.subs(
+                            args[1], symbols['local'][function_state[0]]['params'][args[1]]).evalf()
                 else:
                     return str(integral.function) + ' + C'
             else:
                 return integral.function.evalf()
 
+        elif node.action == 'deriv':
+            import math_functions
+            debug("DIFFERENTIATE", node, node.action, node.param)
+            math_functions.setup()
+            args = []
+            for param in node.param[1]:
+                args.append(self.visit(param))
 
+            diff = math_functions.Math(action='deriv', param=args).exec()
 
+            if len(function_state) != 0:
+                # Check if derivative in a function
+                if args[1] in symbols['local'][function_state[0]]['params']:
+                    return diff.function.subs(args[1], symbols['local'][function_state[0]]['params'][args[1]]).evalf()
 
-
+            else:
+                return diff.function
 
     def visit_FuncDecl(self, node):
         if node.action == 'func_block':
@@ -571,6 +585,72 @@ class AST:
                 return ret_args[0], True
         else:
             return None, True
+
+    def visit_SwitchStmt(self, node):
+        debug("SWITCH BLOCK", node, node.action, node.param)
+        # Switch Statement in the form switch (expr) { case_list }, params = [expr, case_list]
+        switch_scope = self.add_scope('switch', symbols['local'])
+        cond_expr = self.visit(node.param[0])  # get expression symbol
+        # Evaluate each case, if break is hit in one then break the loop
+        for case in node.param[1]:
+            if case.__class__.__name__ != "DefaultStmt":
+                case.param.insert(0, [switch_scope, cond_expr])
+            else:
+                case.param.insert(0, switch_scope)
+            returned = self.visit(case)
+
+            if returned:
+                break
+
+        self.reset_scope(symbols['local'])
+
+    def visit_CaseStmt(self, node):
+        # Case Statement in the form case expr { basic_block },
+        # params = [(switch_scope, cond_expr (SwitchStmt)), expr, basic_block]
+        debug("CASE STATEMENT", node, node.action, node.param, symbols)
+        switch_scope, cond = node.param[0][0], node.param[0][1]
+        has_break = False
+        self.add_scope('case', symbols['local'][switch_scope])
+
+        if cond == self.visit(node.param[1]):
+            for stmt in node.param[2]:
+                ret = self.visit(stmt)
+
+                if ret == 'break':
+                    has_break = True
+                    break
+
+            if not has_break:
+                raise SyntaxError("expected 'break' at the end of a case")
+
+        self.reset_scope(symbols['local'][switch_scope])
+
+        return has_break
+
+    def visit_DefaultStmt(self, node):
+        # Default Statement in the form default { basic_block }, params = [switch_scope, basic_block]
+        debug("DEFAULT STATEMENT", node, node.action, node.param)
+        switch_scope, has_break = node.param[0], False
+        self.add_scope('default', symbols['local'][switch_scope])
+
+        for stmt in node.param[1:]:
+            ret = self.visit(stmt)
+
+            if ret == 'break':
+                has_break = True
+                break
+
+        if not has_break:
+            raise SyntaxError("expected 'break' at the end of default case")
+
+        self.reset_scope(symbols['local'][switch_scope])
+
+        return has_break
+
+    def visit_BreakStmt(self, node):
+        debug("BREAK STATEMENT", node, node.action, node.param)
+        if node.param == 'break':
+            return node.param
 
     def check_positional_arguments(self, update_params, func_local, node):
         # Check for the number of positional arguments
@@ -716,6 +796,26 @@ class FuncBlock(Node):
 
 
 class ReturnStmt(Node):
+    def __init__(self, action, param):
+        super().__init__(action, param)
+
+
+class SwitchStmt(Node):
+    def __init__(self, action, param):
+        super().__init__(action, param)
+
+
+class CaseStmt(Node):
+    def __init__(self, action, param):
+        super().__init__(action, param)
+
+
+class BreakStmt(Node):
+    def __init__(self, action, param):
+        super().__init__(action, param)
+
+
+class DefaultStmt(Node):
     def __init__(self, action, param):
         super().__init__(action, param)
 

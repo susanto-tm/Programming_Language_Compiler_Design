@@ -8,7 +8,7 @@ class Lexer:
         ('string', 'inclusive'),
     )
     reserved = (
-        'AND', 'ATAN', 'ACOS', 'ASIN', 'BREAK', 'CASE', 'COS', 'COSH', 'CONTINUE', 'DEFAULT', 'ELSE', 'FOR',
+        'AND', 'ATAN', 'ACOS', 'ASIN', 'BREAK', 'CASE', 'COS', 'COSH', 'CONTINUE', 'DEFAULT', 'DIFF', 'ELSE', 'FOR',
         'FALSE', 'FLOAT', 'FROM', 'FUNC', 'INT', 'IF', 'INTEGRATE', 'LET', 'LEN', 'NOT', 'NULL', 'OR', 'PRINT',
         'RETURN', 'RANGE', 'SWITCH', 'STRING', 'SIN', 'SINH', 'TO', 'TRUE', 'TYPE', 'TAN', 'TANH',
     )

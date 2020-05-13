@@ -1,3 +1,16 @@
-let k = integrate('2*x^2 + 2', 'x', 0, 1);
+let x = 3;
 
-print(k);
+switch (x) {
+    case 1 {
+        print('hi');
+        break;
+    }
+    case 2 {
+        print('hi 2');
+        break;
+    }
+    default {
+        print('default');
+        break;
+    }
+}
