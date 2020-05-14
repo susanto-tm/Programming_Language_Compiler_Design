@@ -7,7 +7,7 @@ from the "eval" method. A list of all the nodes is stored in its parameters and
 evaluated based on control flow.
 """
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 symbols = {'global': {}, 'local': {}}  # holds symbols for variables
 state = ["global"]  # a stack that holds current variable state and scope
@@ -63,10 +63,12 @@ class AST:
 
             for idx in node.param[1]:  # resolve each indices
                 index.append(self.visit(idx))
-
+            debug("SLICE INDICES", index)
             for idx in index:
-                if not isinstance(idx, int):
-                    raise TypeError(f"list indices must be integers or slices, not {type(idx)}")
+                if isinstance(idx, list):  # list slicing
+                    if any(i not in range(0, len(arr)+1) for i in idx):
+                        raise IndexError("list slice out of range")
+                    arr = arr[idx[0]:idx[1]:idx[2]]
                 elif 0 <= idx < len(arr):
                     arr = arr[idx]
                 else:
@@ -93,16 +95,17 @@ class AST:
             arr[index[-1]] = assignment
 
         elif node.action == 'slice':
+            # Accepts in the form of expr : expr : expr, params = [expr, expr, expr (default 1)]
             # Accepts in the form of ListID[expr : expr : expr] : param = [IDENTIFIER, expr, expr, expr | 1 default]
-            arr = self.visit(Variable(action='get', param=Literal(action='IDEN', param=node.param[0])))
-            start = self.visit(node.param[1])
-            end = self.visit(node.param[2])
-            step = self.visit(node.param[3])
+            # arr = self.visit(Variable(action='get', param=Literal(action='IDEN', param=node.param[0])))
+            start = self.visit(node.param[0])
+            end = self.visit(node.param[1])
+            step = self.visit(node.param[2])
 
             if any(not isinstance(param, int) for param in [start, end, step]):
                 raise TypeError("slice indices must be integers")
 
-            return arr[start:end:step]
+            return [start, end, step]
 
         elif node.action == 'range':
             # Accepts in the form of [INT...INT] or [INT...INT, expr] : param = range
@@ -183,9 +186,10 @@ class AST:
                     # Start at 0 if in local space where variables are within current space
                     start_index = 0 if state[0] != 'params' else 1
                     for func in function_state[start_index:]:
-                        func_param_from = symbols['local'][func]['params']
-                        if identifier in func_param_from:
-                            return func_param_from[identifier]
+                        func_param_from = symbols['local'][func]
+                        for local_scope in func_param_from.keys():
+                            if identifier in func_param_from[local_scope]:
+                                return func_param_from[local_scope][identifier]
 
             raise NameError(f"name '{identifier}' not defined")
 
@@ -581,6 +585,51 @@ class AST:
 
             else:
                 return diff.function
+
+        elif node.action == 'min' or node.action == 'max':
+            # Accepts in form max( expr_list ) or min( expr_list ), params = [expr_list]
+            debug("MIN MAX FUNCTION", node, node.action, node.param)
+            args = []
+            for param in node.param:
+                new_arg = self.visit(param)
+                if isinstance(new_arg, list):
+                    args.extend(new_arg)
+                else:
+                    args.append(new_arg)
+
+            if node.action == 'min':
+                return min(*args)
+            elif node.action == 'max':
+                return max(*args)
+
+        elif node.action == 'typecast':
+            # Accepts in form int(expr), float(expr), str(expr), or list(expr), params = [func, expr]
+            debug("TYPE CASTING", node, node.action, node.param)
+            arg = self.visit(node.param[1])
+
+            if node.param[0].upper() not in ["LIST", "STR"]:
+                result = {
+                    "INT": lambda a: int(a),
+                    "FLOAT": lambda a: float(a),
+                }[node.param[0].upper()](arg)
+
+            elif node.param[0].upper() == "STR":
+                result = f"'{arg}'"
+
+            else:
+                if isinstance(arg, (int, float)):
+                    result = list([arg])
+                elif isinstance(arg, (list, str)):
+                    result = list(arg)
+                else:
+                    raise TypeError(f"'{type(arg)}' object is not iterable")
+
+            return result
+
+        elif node.action == 'type':
+            # Accepts in form type(expr), params = [expr]
+            debug("TYPE FUNCTION", node, node.action, node.param)
+            return type(self.visit(node.param))
 
     def visit_FuncDecl(self, node):
         if node.action == 'func_block':

@@ -17,7 +17,7 @@ def run():
         text = f.read()
         f.close()
     else:
-        f = open('test.ma', 'r')
+        f = open('sample_code.ma', 'r')
         text = f.read()
         f.close()
 

@@ -246,14 +246,13 @@ class Parser:
 
     def p_list_slicing(self, p):
         """
-        expr : IDENTIFIER LBRACKET expr COLON expr RBRACKET
-             | IDENTIFIER LBRACKET expr COLON expr COLON expr RBRACKET
+        expr : expr COLON expr
+             | expr COLON expr COLON expr
         """
-        if len(p) > 7:
-            p[0] = List(action='slice', param=[p[1], p[3], p[5], p[7]])
+        if len(p) > 4:
+            p[0] = List(action='slice', param=[p[1], p[3], p[5]])
         else:
-            p[0] = List(action='slice', param=[p[1], p[3], p[5],
-                                               Literal(action='INTCONST', param=1)])
+            p[0] = List(action='slice', param=[p[1], p[3], Literal(action='INTCONST', param=1)])
 
     def p_boolean(self, p):
         """
@@ -297,6 +296,33 @@ class Parser:
         expr : LEN LPAREN expr RPAREN
         """
         p[0] = FuncCall(action='len', param=p[3])
+
+    def p_func_call_min(self, p):
+        """
+        expr : MIN LPAREN expr_list RPAREN
+        """
+        p[0] = FuncCall(action='min', param=p[3])
+
+    def p_func_call_max(self, p):
+        """
+        expr : MAX LPAREN expr_list RPAREN
+        """
+        p[0] = FuncCall(action='max', param=p[3])
+
+    def p_func_call_typecast(self, p):
+        """
+        expr : INT LPAREN expr RPAREN
+             | FLOAT LPAREN expr RPAREN
+             | STR LPAREN expr RPAREN
+             | LIST LPAREN expr RPAREN
+        """
+        p[0] = FuncCall(action='typecast', param=[p[1], p[3]])
+
+    def p_func_call_type(self, p):
+        """
+        expr : TYPE LPAREN expr RPAREN
+        """
+        p[0] = FuncCall(action='type', param=p[3])
 
     def p_func_call_trig(self, p):
         """

@@ -8,9 +8,9 @@ class Lexer:
         ('string', 'inclusive'),
     )
     reserved = (
-        'AND', 'ATAN', 'ACOS', 'ASIN', 'BREAK', 'CASE', 'COS', 'COSH', 'CONTINUE', 'DEFAULT', 'DIFF', 'ELSE', 'FOR',
-        'FALSE', 'FLOAT', 'FROM', 'FUNC', 'INT', 'IF', 'INTEGRATE', 'LET', 'LEN', 'NOT', 'NULL', 'OR', 'PRINT',
-        'RETURN', 'RANGE', 'SWITCH', 'STRING', 'SIN', 'SINH', 'TO', 'TRUE', 'TYPE', 'TAN', 'TANH',
+        'AND', 'ATAN', 'ACOS', 'ASIN', 'BREAK', 'CASE', 'COS', 'COSH', 'DEFAULT', 'DIFF', 'ELSE', 'FOR',
+        'FALSE', 'FLOAT', 'FUNC', 'INT', 'IF', 'INTEGRATE', 'LET', 'LIST', 'LEN', 'MIN', 'MAX', 'NOT', 'NULL',
+        'OR', 'PRINT', 'RETURN', 'RANGE', 'SWITCH', 'STR', 'SIN', 'SINH', 'TRUE', 'TYPE', 'TAN', 'TANH',
     )
 
     tokens = reserved + (
@@ -31,7 +31,7 @@ class Lexer:
         'PLUSPLUS', 'MINUSMINUS',
 
         # Delimiters ( ) [ ] { } , . ; :
-        'LPAREN', 'RPAREN', 'LBRACKET', 'RBRACKET', 'LBRACE', 'RBRACE', 'COMMA', 'PERIOD', 'SEMICOLON', 'COLON',
+        'LPAREN', 'RPAREN', 'LBRACKET', 'RBRACKET', 'LBRACE', 'RBRACE', 'COMMA', 'SEMICOLON', 'COLON',
 
         # Ellipsis (...)
         'ELLIPSIS',
@@ -80,7 +80,6 @@ class Lexer:
     t_LBRACE = r'\{'
     t_RBRACE = r'\}'
     t_COMMA = r'\,'
-    t_PERIOD = r'\.'
     t_SEMICOLON = r'\;'
     t_COLON = r'\:'
 
@@ -96,10 +95,6 @@ class Lexer:
         r'[A-Za-z][A-Za-z0-9_]*'
         t.type = self.reserved_map.get(t.value, 'IDENTIFIER')
         return t
-
-    # def t_newline(self, t):
-    #     r'\n+'
-    #     t.lexer.lineno += len(t.value)
 
     # Precedence of floats takes over integers
     def t_FLOATCONST(self, t):
