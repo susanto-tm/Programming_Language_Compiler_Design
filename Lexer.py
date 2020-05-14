@@ -67,7 +67,7 @@ class Lexer:
     t_MULEQUALS = r'\*='
     t_DIVEQUALS = r'/='
     t_PLUSEQUALS = r'\+='
-    t_MINUSEQUALS = r'-='
+    t_MINUSEQUALS = r'\-='
     t_MODEQUALS = r'\%='
     t_POWEQUALS = r'\^='
     t_WALRUS = r'\:='

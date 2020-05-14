@@ -98,7 +98,7 @@ class Parser:
         """
         p[0] = Variable(action='reassign', param=[p[1], p[3]])
 
-    def p_reassign_plus_equals(self, p):
+    def p_reassign_binop_equals(self, p):
         """
         statement : IDENTIFIER PLUSEQUALS expr
                   | IDENTIFIER MINUSEQUALS expr
@@ -330,6 +330,7 @@ class Parser:
     def p_cond_list(self, p):
         """
         cond_list : expr %prec COND
+                  | NOT expr
                   | cond_list AND expr
                   | cond_list OR expr
         """

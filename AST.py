@@ -13,7 +13,8 @@ symbols = {'global': {}, 'local': {}}  # holds symbols for variables
 state = ["global"]  # a stack that holds current variable state and scope
 function_state = []  # a stack that holds current scope of functions !!! Only one way recursion works, not backtracking
 # stores different states for when a scope is needed
-scope_needed = ['IfElseBlock', 'IfStmt', 'ElseStmt', 'ForStmt', 'ReturnStmt']
+scope_needed = ['IfElseBlock', 'IfStmt', 'ElseStmt', 'ForStmt', 'ReturnStmt', "WhileStmt"]
+returning = [False]  # keeps state for when something returns
 
 
 class Node:
@@ -240,15 +241,30 @@ class AST:
     def visit_BoolOp(self, node):
         debug("BOOLOP", node, node.action, node.param)
         params = list(node.param)
-        result = self.visit(params.pop(0))
-        while len(params) >= 2:
-            left = result
-            op = params.pop(0).upper()
-            right = self.visit(params.pop(0))
-            result = {
-                "AND": lambda a, b: a and b,
-                "OR": lambda a, b: a or b
-            }[op](left, right)
+        if isinstance(params[0], str) and params[0].upper() == "NOT":
+            params.pop(0)
+            result = self.visit(params.pop(0))
+            if result:
+                return False
+            else:
+                result = not result
+        else:
+            result = self.visit(params.pop(0))
+        if len(params) != 0:
+            # if op is AND and the first argument is false return false
+            if isinstance(params[0], str) and params[0].upper() == "AND" and result is False:
+                return False
+
+            while len(params) >= 2:
+                left = result
+                op = params.pop(0).upper()
+                right = self.visit(params.pop(0))
+                result = {
+                    "AND": lambda a, b: a and b,
+                    "OR": lambda a, b: a or b
+                }[op](left, right)
+
+        debug("BOOLOP RETURN", result)
 
         return result
 
@@ -264,8 +280,7 @@ class AST:
         if if_branch and ret is not None:
             returned = True
 
-        if ret is not None:
-            return ret, returned
+        return ret, returned
 
     def visit_IfStmt(self, node):
         local_symbols = self.determine_local()
@@ -285,6 +300,7 @@ class AST:
 
                 if returned:
                     debug("RET FROM IF", ret, returned, actions)
+                    returning[0] = True
                     break
 
             evaluated = True  # for if else statements, method will decide whether else is needed
@@ -307,6 +323,7 @@ class AST:
                     self.visit(actions)
 
                 if returned:
+                    returning[0] = True
                     break
 
         else:
@@ -356,15 +373,25 @@ class AST:
                 debug("LOOP ITER", i, loop_range, symbols)
                 local_symbols[state[0]][iter_symbol] = i
                 for stmt in block:
-                    ret, returned = self.visit(stmt)  # each new scope is handled by those that need a new scope
-                    debug("RET FROM LOOP", ret, stmt, returned)
-                    if stmt.__class__.__name__ == 'ReturnStmt' or returned:
-                        debug("LOOP")
+                    if stmt.__class__.__name__ in scope_needed:
+                        ret, returned = self.visit(stmt)  # each new scope is handled by those that need a new scope
+                    else:
+                        ret = self.visit(stmt)
+
+                    debug("RET FROM LOOP", ret, stmt, returned, stmt, i)
+                    if returned and ret is not None and stmt.__class__.__name__ in scope_needed:
+                        debug("LOOP", ret, returned, stmt.action, state[0])
+                        returning[0] = True
                         break
-                if returned:
+
+                if returned and ret is not None:
                     break
 
         self.reset_scope(local_symbols)
+
+        # Only reset returned (to fix if statements) if something is returning
+        if not returning[0]:
+            returned = False
 
         return ret, returned
 
@@ -372,13 +399,30 @@ class AST:
         # Accepts param = [conditions for while, block to execute]
         local_symbols = self.determine_local()
         debug("WHILE STATEMENT", node, node.action, node.param)
-        self.add_scope("while_loop", symbols['local'])
+        ret, returned = None, False
+        self.add_scope("while_loop", local_symbols)
 
         while self.visit(node.param[0]):
             for actions in node.param[1]:
-                self.visit(actions)
+                if actions.__class__.__name__ in scope_needed:
+                    ret, returned = self.visit(actions)
+                else:
+                    self.visit(actions)
+
+                if returned and ret is not None:
+                    debug("RET IN WHILE", ret, actions)
+                    returning[0] = True
+                    break
+
+            if returning[0]:
+                break
 
         self.reset_scope(local_symbols)
+
+        if not returning[0]:
+            returned = False
+
+        return ret, returned
 
     def visit_FuncBlock(self, node):
         # Called from FuncCall, params = [IDENTIFIER, exec orders]
@@ -394,6 +438,8 @@ class AST:
                 ret_argument = self.visit(actions)
             debug("RET ARGUMENT", ret_argument, actions)
             if actions.__class__.__name__ == 'ReturnStmt' or returned:
+                returning[0] = True
+                debug("RET", ret_argument, returned, actions, "RETURNING", returning[0])
                 break
 
         debug("STATE IN FUNCBLOCK 1", ret_argument)
@@ -461,6 +507,9 @@ class AST:
             debug("RETURNING FROM CALL", ret_stmt)
 
             symbols['local'].pop(current_scope)
+
+            if returning[0]:
+                returning[0] = False
 
             if ret_stmt is not None:
                 debug("CURRENT STATE", state, symbols)
@@ -614,7 +663,7 @@ class AST:
 
         if cond == self.visit(node.param[1]):
             for stmt in node.param[2]:
-                ret = self.visit(stmt)
+                ret, returned = self.visit(stmt)
 
                 if ret == 'break':
                     has_break = True
