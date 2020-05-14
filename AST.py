@@ -244,9 +244,9 @@ class AST:
         if isinstance(params[0], str) and params[0].upper() == "NOT":
             params.pop(0)
             result = self.visit(params.pop(0))
-            if result:
-                return False
-            else:
+            if result:  # if result is true, not result is False so cond is false
+                result = False
+            else:  # if result is false, not result is True so cond is True
                 result = not result
         else:
             result = self.visit(params.pop(0))
@@ -277,7 +277,7 @@ class AST:
 
         debug("IF STMT RET", ret)
 
-        if if_branch and ret is not None:
+        if returning[0] and ret is not None:
             returned = True
 
         return ret, returned

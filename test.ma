@@ -51,7 +51,10 @@ func test(let x) {
     if x == 0 {
         return null;
     }
+    else {
+        return x;
+    }
     print('hi');
 }
 
-print(test(0));
+print(test(1));
