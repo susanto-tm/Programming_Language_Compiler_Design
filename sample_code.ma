@@ -81,6 +81,22 @@ hashtags(1, 9);
 print();
 
 print(insertion_sort([1, 3, 2, 3, 10, 0, -1, -100]));
+print();
+
+// Lists
+
+// List Generation
+let arr = [0...20, 2];
+print("All even numbers from 0 to 20:", arr);
+print();
+
+// List Indexing
+let arr1 = [1, 2, [3, 4, [5, 6], 7], 8];
+print("Element [5, 6] using indices by calling arr1[2, 2]:", arr1[2, 2]);
+
+// List Slicing
+print("Element [3, 4, [5, 6]] using slicing and indexing by calling arr1[2, 0:3]:", arr1[2, 0:3]);
+print();
 
 // Built-in Mathematical Functions and Inline Functions
 
